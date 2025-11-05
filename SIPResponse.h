@@ -1,0 +1,8 @@
+//
+// Created by dkueh on 05.11.2025.
+//
+
+#ifndef SIP_PARSER_SIPRESPONSE_H
+#define SIP_PARSER_SIPRESPONSE_H
+
+#endif //SIP_PARSER_SIPRESPONSE_H
