@@ -20,6 +20,17 @@ public:
     std::string_view get_to_uri() const { return to_uri; }
     std::string_view get_to_host() const { return to_host; }
     std::string_view get_to_tag() const { return to_tag; }
+    std::string_view get_cseq_nr() const { return cseq_nr; }
+    std::string_view get_cseq_typ() const { return cseq_typ; }
+    std::string_view get_contact_uri() const { return contact_uri; }
+    std::string_view get_contact_host() const { return contact_host; }
+    std::string_view get_contact_port() const { return contact_port; }
+    std::string_view get_contact_transport() const { return contact_transport; }
+    std::string_view get_contact_param() const { return contact_param; }
+    std::string_view get_pai_uri() const { return pai_uri; }
+    std::string_view get_pai_host() const { return pai_host; }
+    std::string_view get_ppi_uri() const { return ppi_uri; }
+    std::string_view get_ppi_host() const { return ppi_host; }
 
 protected:
     void parse_message() override;
@@ -40,23 +51,22 @@ private:
     std::string_view to_host;
     std::string_view to_tag;
 
-    //void parse_cseq();
+    void parse_cseq();
     std::string_view cseq_nr;
     std::string_view cseq_typ;
 
-    //void parse_contact();
-    std::string_view contact_header;
+    void parse_contact();
     std::string_view contact_uri;
     std::string_view contact_host;
+    std::string_view contact_port;
+    std::string_view contact_transport;
     std::string_view contact_param;
 
-    //void parse_pai();
-    std::string_view pai_header;
+    void parse_pai();
     std::string_view pai_uri;
     std::string_view pai_host;
 
-    //void parse_ppi();
-    std::string_view ppi_header;
+    void parse_ppi();
     std::string_view ppi_uri;
     std::string_view ppi_host;
 };

@@ -12,9 +12,9 @@ constexpr std::string_view INVITE =
     "To: \"dsaflkjdlkj\" <sip:bob222@ims.telekom.de>;tag=12354\r\n"
     "Call-ID: 1234567890@client.example.com\r\n"
     "P-Asserted-Identity: <sip:+49123456789@tel.t-online.de>\r\n"
-    "p-preferred-identity: <sip:4911111111@192.168.178.1_5060>\r\n"
+    "p-preferred-identity: <sip:4911111111@192.168.178.1:5060>\r\n"
     "CSeq: 1 INVITE\r\n"
-    "Contact: <sip:alice@client.example.com:5060>\r\n"
+    "Contact: <sip:alice@client.example.com:5060;transport=tcp>;expire=200\r\n"
     "Content-Type: application/sdp\r\n"
     "Content-Length: 129\r\n"
     "\r\n"
@@ -29,15 +29,10 @@ constexpr std::string_view INVITE =
 int main() {
     try {
         auto request = SIPRequest(std::string(INVITE));
-        std::cout << "URI: '" << request.get_to_uri() << "'" << std::endl;
-        std::cout << "Host: '" << request.get_to_host() << "'" << std::endl;
+        std::cout << "PPI URI: '" << request.get_ppi_uri() << "'" << std::endl;
+        std::cout << "PPI Host: '" << request.get_ppi_host() << "'" << std::endl;
 
-        if (request.get_to_tag().empty()) {
-            std::cout << "No To-Tag" << std::endl;
-        } else {
-            std::cout << "Tag: '" << request.get_to_tag() << "'" << std::endl;
 
-        }
 
     } catch (const std::invalid_argument& e) {
         std::cerr << e.what() << std::endl;

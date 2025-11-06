@@ -15,19 +15,22 @@ SIPRequest::SIPRequest(std::string message, std::string source_ip, uint16_t sour
 }
 
 void SIPRequest::parse_message() {
+    auto start = std::chrono::high_resolution_clock::now();
     parse_request_line();
     parse_from();
-    auto start = std::chrono::high_resolution_clock::now();
     parse_to();
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration = end - start;
-    std::cout << "[SIPRequest to] Execution-Time: " << duration.count() << "ms" << std::endl;
-
-
-    /*parse_cseq();
+    parse_cseq();
     parse_contact();
     parse_pai();
-    parse_ppi();*/
+    parse_ppi();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+    std::cout << "[SIPRequest All] Execution-Time: " << duration.count() << "ms" << std::endl;
+
+
+    /*
+
+    ;*/
 
 }
 
@@ -105,4 +108,92 @@ void SIPRequest::parse_to() {
         to_host = to_header.substr(host_sep + 1, end_brack != std::string_view::npos ? end_brack - host_sep - 1 : last_sep - host_sep - 1);
         to_tag = to_header.substr(last_sep + 1, line_end - last_sep - 1);
     }
+}
+
+void SIPRequest::parse_cseq() {
+    auto first_space = cseq_header.find(' ');
+    auto line_end = cseq_header.find('\r');
+    if (first_space == std::string_view::npos || line_end == std::string_view::npos) {
+        std::cerr << "[SIPRequest::parse_cseq()]: Malformed CSeq header!" << std::endl;
+        return;
+    }
+
+    cseq_nr = cseq_header.substr(0, first_space);
+    cseq_typ = cseq_header.substr(first_space + 1, line_end - first_space - 1);
+}
+
+void SIPRequest::parse_contact() {
+    auto contact = get_header("Contact");
+    if (contact.empty()) {
+        std::cerr << "[SIPRequest::parse_contact()]: No Contact-header found!" << std::endl;
+        return;
+    }
+    auto uri_begin = contact.find("sip:");
+    auto host_sep = contact.find('@', uri_begin);
+    if (uri_begin == std::string_view::npos && host_sep == std::string_view::npos) {
+        std::cerr << "[SIPRequest::parse_contact()]: Malformed Contact header!" << std::endl;
+        return;
+    }
+    auto port_sep = contact.find(':', host_sep);
+    auto param_sep = contact.find(';', port_sep);
+    auto header_end = contact.find('>', host_sep);
+    auto line_end = contact.find('\r');
+
+    contact_uri = contact.substr(uri_begin + 4, host_sep - (uri_begin + 4));
+    contact_host = contact.substr(host_sep + 1, port_sep - host_sep - 1);
+    contact_port = contact.substr(port_sep + 1, param_sep - port_sep - 1);
+    contact_transport = contact.substr(param_sep + 1, header_end - param_sep - 1);
+    contact_param = contact.substr(header_end + 1, line_end - header_end - 1);
+}
+
+void SIPRequest::parse_pai() {
+    auto pai = get_header("P-Asserted-Identity");
+    if (pai.empty()) {
+        pai_uri = {};
+        pai_host = {};
+        return;
+    }
+
+    auto uri_begin = pai.find("sip:");
+    if (uri_begin == std::string_view::npos) {
+        std::cerr << "[SIPRequest::parse_pai()]: Malformed PAI header!" << std::endl;
+        return;
+    }
+    auto host_sep = pai.find('@', uri_begin + 4);
+    if (host_sep == std::string_view::npos) {
+        std::cerr << "[SIPRequest::parse_pai()]: Malformed PAI header!" << std::endl;
+        return;
+    }
+    auto line_end = pai.find('>', host_sep + 1);
+    if (line_end == std::string_view::npos) {
+        line_end = pai.find('\r');
+    }
+    pai_uri = pai.substr(uri_begin + 4, host_sep - (uri_begin + 4));
+    pai_host = pai.substr(host_sep + 1, line_end - host_sep - 1);
+}
+
+void SIPRequest::parse_ppi() {
+    auto ppi = get_header("p-preferred-identity");
+    if (ppi.empty()) {
+        ppi_uri = {};
+        ppi_host = {};
+        return;
+    }
+
+    auto uri_begin = ppi.find("sip:");
+    if (uri_begin == std::string_view::npos) {
+        std::cerr << "[SIPRequest::parse_ppi()]: Malformed PPI header!" << std::endl;
+        return;
+    }
+    auto host_sep = ppi.find('@', uri_begin + 4);
+    if (host_sep == std::string_view::npos) {
+        std::cerr << "[SIPRequest::parse_ppi()]: Malformed PPI header!" << std::endl;
+        return;
+    }
+    auto line_end = ppi.find('>', host_sep + 1);
+    if (line_end == std::string_view::npos) {
+        line_end = ppi.find('\r');
+    }
+    ppi_uri = ppi.substr(uri_begin + 4, host_sep - (uri_begin + 4));
+    ppi_host = ppi.substr(host_sep + 1, line_end - host_sep - 1);
 }
