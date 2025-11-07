@@ -7,6 +7,20 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+
+struct SIP_P_Header {
+    std::string_view uri;
+    std::string_view host;
+};
+
+struct SIP_VIA_Header {
+    std::string_view transport;
+    std::string_view uri;
+    std::string_view port;
+    std::string_view branch;
+};
 
 
 class SIPMessage {
@@ -19,11 +33,12 @@ public:
     std::string_view to() const { return to_header; };
     std::string_view cseq() const { return cseq_header; };
     std::string_view content_length() const { return content_length_header; };
-    std::string_view get_header(std::string_view header_value) const;
+    const std::vector<std::string_view>& get_header(std::string_view header_value) const;
 
-    virtual void parse_message();
+
 
 protected:
+    virtual void parse_message();
     std::string m_message;
     std::string m_source_ip;
     std::uint16_t m_source_port;
@@ -33,8 +48,34 @@ protected:
     std::string_view to_header;
     std::string_view cseq_header;
     std::string_view content_length_header;
+    bool has_payload = false;
 
-    std::unordered_map<std::string_view, std::string_view> m_headers;
+    std::unordered_map<std::string_view, std::vector<std::string_view>> m_headers;
+
+    //specific parsing-function needed for base-classes:
+    void parse_via();
+    std::vector<SIP_VIA_Header> via_list;
+
+    void parse_from();
+    std::string_view from_uri;
+    std::string_view from_host;
+    std::string_view from_tag;
+
+    void parse_to();
+    std::string_view to_uri;
+    std::string_view to_host;
+    std::string_view to_tag;
+
+    void parse_cseq();
+    std::string_view cseq_nr;
+    std::string_view cseq_typ;
+
+    void parse_contact();
+    std::string_view contact_uri;
+    std::string_view contact_host;
+    std::string_view contact_port;
+    std::string_view contact_transport;
+    std::string_view contact_param;
 };
 
 

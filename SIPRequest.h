@@ -7,6 +7,18 @@
 
 #include "SIPMessage.h"
 
+enum class SIPMethod {
+    INVITE,
+    ACK,
+    BYE,
+    REGISTER,
+    OPTIONS,
+    CANCEL,
+    UPDATE,
+    PRACK,
+    UNKNOWN
+};
+
 class SIPRequest : public SIPMessage {
 public:
     explicit SIPRequest(std::string message, std::string source_ip = "0.0.0.0", uint16_t source_port = 5060);
@@ -27,48 +39,26 @@ public:
     std::string_view get_contact_port() const { return contact_port; }
     std::string_view get_contact_transport() const { return contact_transport; }
     std::string_view get_contact_param() const { return contact_param; }
-    std::string_view get_pai_uri() const { return pai_uri; }
-    std::string_view get_pai_host() const { return pai_host; }
-    std::string_view get_ppi_uri() const { return ppi_uri; }
-    std::string_view get_ppi_host() const { return ppi_host; }
+    const std::vector<SIP_P_Header>& get_pai() const { return pai_list; }
+    const std::vector<SIP_P_Header>& get_ppi() const { return ppi_list; }
+    const std::vector<SIP_VIA_Header>& get_via() const { return via_list; }
 
 protected:
     void parse_message() override;
 
 private:
+    SIPMethod parse_method_enum(std::string_view method) const;
+    SIPMethod m_method_enum;
+
     void parse_request_line();
     std::string_view m_method;
     std::string_view m_uri;
     std::string_view m_host;
 
-    void parse_from();
-    std::string_view from_uri;
-    std::string_view from_host;
-    std::string_view from_tag;
-
-    void parse_to();
-    std::string_view to_uri;
-    std::string_view to_host;
-    std::string_view to_tag;
-
-    void parse_cseq();
-    std::string_view cseq_nr;
-    std::string_view cseq_typ;
-
-    void parse_contact();
-    std::string_view contact_uri;
-    std::string_view contact_host;
-    std::string_view contact_port;
-    std::string_view contact_transport;
-    std::string_view contact_param;
-
     void parse_pai();
-    std::string_view pai_uri;
-    std::string_view pai_host;
-
+    std::vector<SIP_P_Header> pai_list;
     void parse_ppi();
-    std::string_view ppi_uri;
-    std::string_view ppi_host;
+    std::vector<SIP_P_Header> ppi_list;
 };
 
 #endif //SIP_PARSER_SIPREQUEST_H
