@@ -29,8 +29,14 @@ constexpr std::string_view INVITE =
 int main() {
     try {
         auto request = SIPRequest(std::string(INVITE));
-        std::cout << "PPI URI: '" << request.get_ppi_uri() << "'" << std::endl;
-        std::cout << "PPI Host: '" << request.get_ppi_host() << "'" << std::endl;
+        auto via_header = request.get_via();
+        for (const auto& via : via_header) {
+            std::cout << "VIA Transport: '" << via.transport << "'" << std::endl;
+            std::cout << "VIA URI: '" << via.uri << "'" << std::endl;
+            std::cout << "VIA Port: '" << via.port << "'" << std::endl;
+            std::cout << "VIA Branch: '" << via.branch << "'" << std::endl;
+        }
+
 
 
 
