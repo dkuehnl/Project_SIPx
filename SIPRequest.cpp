@@ -1,6 +1,70 @@
-//
-// Created by dkueh on 04.11.2025.
-//
+/*
+ *  Project SIPx
+ *  -------------
+ *  SIPx is a flexible and extensible SIP engine designed primarily for
+ *  troubleshooting, edge-case testing, and IMS-related scenarios. Its main goal
+ *  is to give developers and DevOps engineers the ability to inspect,
+ *  manipulate, and stress-test SIP/SDP/RTP flows in detail, including realistic
+ *  failure and corner-case simulations.
+ *
+ *
+ *  Description of SIPRequest:
+ *  --------------------------
+ *  The SIPRequest class represents all inbound SIP request types derived from
+ *  the SIPMessage base class. It specializes the generic parsing logic by
+ *  focusing on the request-line structure and request-specific headers such as
+ *  P-Asserted-Identity (PAI) and P-Preferred-Identity (PPI).
+ *
+ *  Main responsibilities:
+ *    • Parsing the SIP request line (method, request URI, host)
+ *    • Converting the SIP method string into a strongly typed SIPMethod enum
+ *    • Extracting request-specific identity headers (PAI / PPI)
+ *    • Providing direct accessors for method, URI, host, and parsed identity lists
+ *    • Extending the base parser with additional logic for INVITE/UPDATE
+ *      (e.g., detecting and preparing SDP parsing)
+ *
+ *  Internal structure:
+ *    • The request-line is processed via parse_request_line(), which extracts
+ *      the method token, request URI, and host portion.
+ *    • The SIPMethod enum is used to categorize the method efficiently and
+ *      enables lightweight dispatching inside parse_message().
+ *    • PAI and PPI headers are parsed into SIP_P_Header structures, each
+ *      containing a URI and host extracted from the original SIP header.
+ *    • Similar to SIPMessage, all values are stored as string_view references
+ *      pointing directly into the original SIP message buffer for performance
+ *      and zero-copy efficiency.
+ *
+ *  Behavior and parsing notes:
+ *    • Malformed PAI/PPI headers generate log warnings but do not abort
+ *      processing, ensuring that edge-case scenarios can still be tested.
+ *    • Unknown SIP methods are classified as SIPMethod::UNKNOWN and handled
+ *      gracefully without causing exceptions or termination.
+ *
+ *  Purpose and usage:
+ *    SIPRequest provides a structured and efficient representation of
+ *    SIP request messages such as INVITE, REGISTER, OPTIONS, UPDATE, etc.
+ *    It acts as the request-specific extension layer over the generic
+ *    SIPMessage parsing logic and is intended to be used in scenarios where
+ *    request semantics (method, identity headers, URI/host analysis) matter.
+ *
+ *  Author:  Dennis Kühnlein
+ *  Version: v0.1
+ *  Created: 05.11.2025
+ *  Updated: 15.11.2025
+ *
+ *  License:
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ */
+
 
 
 #include "SIPRequest.h"
@@ -15,7 +79,7 @@ SIPRequest::SIPRequest(std::string message, std::string source_ip, uint16_t sour
     SIPRequest::parse_message();
 }
 
-SIPMethod SIPRequest::parse_method_enum(std::string_view method) const {
+SIPMethod SIPRequest::parse_method_enum(std::string_view method) {
     std::string upper(method);
     std::transform(upper.begin(), upper.end(), upper.begin(), toupper);
 
@@ -32,21 +96,10 @@ SIPMethod SIPRequest::parse_method_enum(std::string_view method) const {
 }
 
 void SIPRequest::parse_message() {
-
     parse_request_line();
-    parse_from();
-    parse_to();
-    parse_cseq();
-    auto start = std::chrono::high_resolution_clock::now();
-    parse_via();
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration = end - start;
-    std::cout << "[SIPRequest Via] Execution-Time: " << duration.count() << "ms" << std::endl;
-
 
     switch (m_method_enum) {
         case SIPMethod::INVITE:
-            parse_contact();
             parse_pai();
             parse_ppi();
             //detect SDP
