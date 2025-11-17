@@ -10,4 +10,6 @@ add_executable(sip_parser main.cpp
         SIPResponse.cpp
         SIPRequest.h
         SIPResponse.h
+        SIPLogWriter.cpp
+        SIPLogWriter.h
 )

@@ -56,10 +56,13 @@
 
 #ifndef SIP_PARSER_SIPMESSAGE_H
 #define SIP_PARSER_SIPMESSAGE_H
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "SIPLogWriter.h"
 
 
 struct SIP_P_Header {
@@ -77,9 +80,15 @@ struct SIP_VIA_Header {
 
 class SIPMessage {
 public:
-    explicit SIPMessage(std::string message, std::string source_ip = "0.0.0.0", std::uint16_t source_port = 5060);
+    explicit SIPMessage(
+        std::string message,
+        SIPLogWriter& logger,
+        std::string source_ip = "0.0.0.0",
+        std::uint16_t source_port = 5060
+        );
     virtual ~SIPMessage() = default;
 
+    ErrorCode status() const { return m_parsing_status; }
     std::string_view request_line() const { return m_request_line; }
     std::string_view from() const { return from_header; }
     std::string_view to() const { return to_header; }
@@ -118,7 +127,16 @@ public:
 
 
 protected:
-    virtual void parse_message();
+    static bool is_value_ascii(std::string_view value);
+    static bool is_header_ascii(std::string_view header);
+    ErrorCode m_parsing_status = ErrorCode::OK;
+    SIPLogWriter& m_logger;
+
+    virtual bool parse_message();
+    bool parse_all();
+
+    using ParserFn = ErrorCode (SIPMessage::*)();
+
     std::string m_message;
     std::string m_source_ip;
     std::uint16_t m_source_port;
@@ -131,36 +149,36 @@ protected:
     std::unordered_map<std::string_view, std::vector<std::string_view>> m_headers;
 
     //specific parsing-function needed for base-classes:
-    void parse_via();
+    ErrorCode parse_via();
     std::vector<SIP_VIA_Header> via_list;
 
-    void parse_from();
+    ErrorCode parse_from();
     std::string_view from_uri;
     std::string_view from_host;
     std::string_view from_tag;
 
-    void parse_to();
+    ErrorCode parse_to();
     std::string_view to_uri;
     std::string_view to_host;
     std::string_view to_tag;
 
-    void parse_cseq();
+    ErrorCode parse_cseq();
     std::string_view cseq_nr;
     std::string_view cseq_typ;
 
-    void parse_contact();
+    ErrorCode parse_contact();
     std::string_view contact_uri;
     std::string_view contact_host;
     std::string_view contact_port;
     std::string_view contact_transport;
     std::string_view contact_param;
 
-    void parse_content();
+    ErrorCode parse_content();
     bool has_content = false;
     uint16_t content_length = 0;
     std::string_view content_type;
 
-    void parse_list_headers(const std::string& header_name);
+    ErrorCode parse_list_headers(const std::string& header_name);
     bool supported_100_rel = false;
     bool supported_timer = false;
     bool required_100_rel = false;
@@ -169,9 +187,9 @@ protected:
 
     //Parsing-Funktion für Supported, Required und Allow-Header
     static std::vector<std::string_view> parse_values(const std::vector<std::string_view>& list);
-    void parse_session_expire();
-    uint16_t min_se;
-    uint16_t refresh_timer;
+    ErrorCode parse_session_expire();
+    uint16_t min_se = 0;
+    uint16_t refresh_timer = 0;
     std::string_view refresher;
 
     //Function-Dispatcher
