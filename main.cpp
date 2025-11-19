@@ -4,6 +4,7 @@
 #include "parser/SIPMessage.h"
 #include "parser/SIPRequest.h"
 #include "parser/SIPResponse.h"
+#include "logwriter/SIPLogWriter.h"
 
 constexpr std::string_view INVITE =
     "INVITE sip:bob@ims.telekom.de SIP/2.0\r\n"

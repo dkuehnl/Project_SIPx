@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 4.0)
-project(sip_parser)
+project(Project_SIPx)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(sip_parser main.cpp
+add_executable(Project_SIPx main.cpp
         parser/SIPMessage.cpp
         parser/SIPMessage.h
         parser/SIPRequest.cpp
