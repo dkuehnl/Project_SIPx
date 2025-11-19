@@ -69,6 +69,7 @@
 #define SIP_PARSER_SIPREQUEST_H
 
 #include "SIPMessage.h"
+#include "SIPLogWriter.h"
 
 enum class SIPMethod {
     INVITE,
@@ -84,7 +85,7 @@ enum class SIPMethod {
 
 class SIPRequest : public SIPMessage {
 public:
-    explicit SIPRequest(std::string message, std::string source_ip = "0.0.0.0", uint16_t source_port = 5060);
+    explicit SIPRequest(std::string message, SIPLogWriter& logger, std::string source_ip = "0.0.0.0", uint16_t source_port = 5060);
 
     std::string_view method() const { return m_method; }
     std::string_view request_uri() const { return m_uri; }
@@ -93,20 +94,20 @@ public:
     const std::vector<SIP_P_Header>& get_ppi() const { return ppi_list; }
 
 protected:
-    void parse_message() override;
+    bool parse_message() override;
 
 private:
     static SIPMethod parse_method_enum(std::string_view method);
     SIPMethod m_method_enum;
 
-    void parse_request_line();
+    ErrorCode parse_request_line();
     std::string_view m_method;
     std::string_view m_uri;
     std::string_view m_host;
 
-    void parse_pai();
+    ErrorCode parse_pai();
     std::vector<SIP_P_Header> pai_list;
-    void parse_ppi();
+    ErrorCode parse_ppi();
     std::vector<SIP_P_Header> ppi_list;
 };
 

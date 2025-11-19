@@ -27,11 +27,13 @@ enum class ErrorCode {
 
 class SIPLogWriter {
 public:
-    SIPLogWriter(const std::string& filepath);
-    ~SIPLogWriter();
+    explicit SIPLogWriter(std::string  filepath);
 
     void write_log(std::string_view msg);
-    void parse_error_code(ErrorCode code);
+    static std::string_view parse_error_code(ErrorCode code);
+
+private:
+    std::string m_filepath;
 };
 
 

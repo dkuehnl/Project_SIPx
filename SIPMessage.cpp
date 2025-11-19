@@ -125,7 +125,7 @@ SIPMessage::SIPMessage(std::string message, SIPLogWriter& logger, std::string so
     }
 
     if (!SIPMessage::parse_message()) {
-
+        return;
     }
     if (!parse_all()) {
 
@@ -133,7 +133,8 @@ SIPMessage::SIPMessage(std::string message, SIPLogWriter& logger, std::string so
 }
 
 bool SIPMessage::is_value_ascii(const std::string_view value) {
-    for (unsigned char c : value) {
+    for (const unsigned char c : value) {
+
         if (c == '\r' || c == '\n') continue;
         if (c >= 0x21 && c <= 0x7E) continue;
         if (c == ' ') continue;
@@ -143,7 +144,7 @@ bool SIPMessage::is_value_ascii(const std::string_view value) {
 }
 
 bool SIPMessage::is_header_ascii(const std::string_view header) {
-    for (unsigned char c : header) {
+    for (const unsigned char c : header) {
         if (c > 127) return false;
         if (!std::isalnum(c) && c != '-' && c != '_') return false;
     }
@@ -158,6 +159,11 @@ bool SIPMessage::parse_message() {
     const char* line_end = std::search(ptr, end, "\r\n", "\r\n" + 2);
     if (line_end != end) {
         m_request_line = std::string_view(ptr, line_end - ptr);
+        if (!is_value_ascii(m_request_line)) {
+            m_parsing_status = ErrorCode::BAD_REQUEST;
+            m_logger.write_log("[SIPMessage::parse_message()] Invalid request-line");
+            return false;
+        }
         ptr = line_end + 2;
     }
 
@@ -169,7 +175,6 @@ bool SIPMessage::parse_message() {
         if (colon != next_line) {
             std::string_view name(ptr, colon - ptr);
             std::string_view value(colon + 1, next_line - colon);
-
             while (!value.empty() && value.front() == ' ') value.remove_prefix(1);
 
             auto cmp = [](std::string_view a, std::string_view b) {
@@ -180,9 +185,9 @@ bool SIPMessage::parse_message() {
                 return true;
             };
 
-            if (!is_header_ascii(name) || is_value_ascii(value)) {
+            if (!is_header_ascii(name) || !is_value_ascii(value)) {
                 m_parsing_status = ErrorCode::BAD_REQUEST;
-                m_logger.write_log("[SIPMessage::parse_message()] Invalid message");
+                m_logger.write_log(std::format("[SIPMessage::parse_message()] Invalid message: {}", name));
                 break;
             }
 
@@ -241,7 +246,7 @@ bool SIPMessage::parse_all() {
         sdp_content = content.substr(sip_end + 4);
         if (sdp_content.size() != content_length) {
             m_parsing_status = ErrorCode::LENGTH_REQUIRED;
-            m_logger.write_log("[SIPMessage::parse_message()] Incomplete Content");
+            m_logger.write_log("[SIPMessage::parse_all()] Incomplete Content");
             return false;
         }
     }
@@ -456,7 +461,7 @@ ErrorCode SIPMessage::parse_session_expire() {
             try {
                 temp_int_val = static_cast<uint16_t>(std::stoi(std::string(temp_val)));
             } catch (const std::exception& e) {
-                m_logger.write_log("[SIPMessage::parse_session_expire()]: Invalid Min-SE-value: " + e.what());
+                m_logger.write_log(std::format("[SIPMessage::parse_session_expire()]: Invalid Min-SE-value: {}",e.what()));
                 return ErrorCode::BAD_REQUEST;
             }
             min_se = temp_int_val;
@@ -490,7 +495,7 @@ ErrorCode SIPMessage::parse_session_expire() {
          try {
              temp_timer_val = static_cast<uint16_t>(std::stoi(std::string(temp_timer)));
          } catch (const std::exception& e) {
-             std::cerr << "[SIPMessage::parse_session_expire()]: Invalid Refresh-Timer: " << e.what() << std::endl;
+             m_logger.write_log(std::format("[SIPMessage::parse_session_expire()]: Invalid Refresh-Timer: {}", e.what()));
              return ErrorCode::BAD_REQUEST;
          }
          refresh_timer = temp_timer_val;
@@ -509,7 +514,7 @@ ErrorCode SIPMessage::parse_content() {
     try {
         tmp_cont_length = static_cast<uint16_t>(std::stoi(std::string(list_content_length[0])));
     } catch (const std::exception& e) {
-        m_logger.write_log("[SIPMessage::parse_content()]: Invalid Content-Length: " << e.what());
+        m_logger.write_log(std::format("[SIPMessage::parse_content()]: Invalid Content-Length: {}", e.what()));
         return ErrorCode::BAD_REQUEST;
     }
     content_length = tmp_cont_length;

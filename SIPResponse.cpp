@@ -62,40 +62,47 @@
 
 #include "SIPResponse.h"
 
+#include <format>
 #include <iostream>
 
-SIPResponse::SIPResponse(std::string message, std::string source_ip, uint16_t source_port)
-    : SIPMessage(std::move(message), std::move(source_ip), source_port) {
+SIPResponse::SIPResponse(std::string message, SIPLogWriter& logger, std::string source_ip, uint16_t source_port)
+    : SIPMessage(std::move(message), logger, std::move(source_ip), source_port) {
 
-    SIPResponse::parse_message();
+    if (m_parsing_status == ErrorCode::OK) {
+        SIPResponse::parse_message();
+    }
 }
 
-void SIPResponse::parse_message() {
-    parse_request_line();
-
+bool SIPResponse::parse_message() {
+    if ((m_parsing_status = parse_request_line()) != ErrorCode::OK) {
+        return false;
+    }
+    return true;
 }
 
-void SIPResponse::parse_request_line() {
-    auto code_start = m_request_line.find("SIP/2.0");
+ErrorCode SIPResponse::parse_request_line() {
+    const auto code_start = m_request_line.find("SIP/2.0");
     if (code_start == std::string_view::npos) {
-        std::cerr << "[SIPRequest::parse_request_line()]: Malformed Request-Line, no SIP/2.0 found!" << std::endl;
-        return;
+        m_logger.write_log("[SIPRequest::parse_request_line()]: Malformed Request-Line, no SIP/2.0 found!");
+        return ErrorCode::BAD_REQUEST;
     }
-    auto code_sep = m_request_line.find(' ', code_start + 8);
+    const auto code_sep = m_request_line.find(' ', code_start + 8);
     if (code_sep == std::string_view::npos) {
-        std::cerr << "[SIPRequest::parse_request_line()]: Malformed Request-Line!" << std::endl;
-        return;
+        m_logger.write_log("[SIPRequest::parse_request_line()]: Malformed Request-Line!");
+        return ErrorCode::BAD_REQUEST;
     }
 
-    std::string_view temp_code = m_request_line.substr(code_start + 8, code_sep - (code_start + 8));
+    const std::string_view temp_code = m_request_line.substr(code_start + 8, code_sep - (code_start + 8));
     uint16_t temp_code_val = 0;
     try {
         temp_code_val = static_cast<uint16_t>(std::stoi(std::string(temp_code)));
     } catch (const std::exception& e) {
-        std::cerr << "[SIPRequest::parse_request_line()]: Invalid response code: " << e.what() << std::endl;
-        return;
+        m_logger.write_log(std::format("[SIPRequest::parse_request_line()]: Invalid response code: {}", e.what()));
+        return ErrorCode::BAD_REQUEST;
     }
     response_type = m_request_line.substr(code_sep + 1);
     response_code = temp_code_val;
+
+    return ErrorCode::OK;
 }
 

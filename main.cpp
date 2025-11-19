@@ -18,7 +18,7 @@ constexpr std::string_view INVITE =
     "Allow: INVITE, ACK, OPTIONS, BYE, CANCEL, REGISTER, INFO, UPDATE, PRACK\r\n"
     "Contact: <sip:alice@client.example.com:5060;transport=tcp>;expire=200\r\n"
     "Content-Type: application/sdp\r\n"
-    "Content-Length: 129\r\n"
+    "Content-Length: 148\r\n"
     "\r\n"
     "v=0\r\n"
     "o=alice 53655765 2353687637 IN IP4 client.example.com\r\n"
@@ -74,13 +74,20 @@ constexpr std::string_view Response_200 =
 
 
 int main() {
-    auto logger = SIPLogWriter(R"(C:\Users\dkueh\Workspace\cpp\sip_engine\sip_parser)");
 
     try {
-        auto request = SIPRequest(std::string(INVITE));
-        std::cout << "INVITE: " << std::endl;
-        std::cout
-        << "SDP-Content: '" << request.sdp() << "'" << std::endl;
+        auto logger = SIPLogWriter(R"(C:\Users\dkueh\Workspace\cpp\sip_engine\sip_parser)");
+
+        auto request = SIPRequest(std::string(INVITE), logger);
+        if (request.status() != ErrorCode::OK) {
+            std::cout << "Error: " << SIPLogWriter::parse_error_code(request.status()) << std::endl;
+            return 1;
+        } else {
+            std::cout << "INVITE: " << std::endl;
+            std::cout
+            << "SDP-Content: '" << request.sdp() << "'" << std::endl;
+        }
+
 
         /*auto response_180 = SIPResponse(std::string(Response_180));
         std::cout << "Response 180:" << std::endl;

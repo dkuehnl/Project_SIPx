@@ -73,10 +73,12 @@
 #include <chrono>
 #include <vector>
 
-SIPRequest::SIPRequest(std::string message, std::string source_ip, uint16_t source_port)
-    : SIPMessage(std::move(message), std::move(source_ip), source_port) {
+SIPRequest::SIPRequest(std::string message, SIPLogWriter& logger, std::string source_ip, const uint16_t source_port)
+    : SIPMessage(std::move(message), logger, std::move(source_ip), source_port) {
 
-    SIPRequest::parse_message();
+    if (m_parsing_status == ErrorCode::OK) {
+        SIPRequest::parse_message();
+    }
 }
 
 SIPMethod SIPRequest::parse_method_enum(std::string_view method) {
@@ -95,13 +97,19 @@ SIPMethod SIPRequest::parse_method_enum(std::string_view method) {
     return SIPMethod::UNKNOWN;
 }
 
-void SIPRequest::parse_message() {
-    parse_request_line();
+bool SIPRequest::parse_message() {
+    if ((m_parsing_status = parse_request_line()) != ErrorCode::OK) {
+        return false;
+    }
 
     switch (m_method_enum) {
         case SIPMethod::INVITE:
-            parse_pai();
-            parse_ppi();
+            if ((m_parsing_status = parse_pai()) != ErrorCode::OK) {
+                return false;
+            }
+            if ((m_parsing_status = parse_ppi()) != ErrorCode::OK) {
+                return false;
+            }
             //detect SDP
             break;
         case SIPMethod::ACK:
@@ -125,75 +133,84 @@ void SIPRequest::parse_message() {
             break;
     }
 
+    return true;
 }
 
-void SIPRequest::parse_request_line() {
+ErrorCode SIPRequest::parse_request_line() {
     auto request_line = SIPMessage::request_line();
-    auto first_space = request_line.find(' ');
-    auto second_space = request_line.find(' ', first_space + 1);
-    auto host_seperator = request_line.find('@', first_space + 1);
+    const auto first_space = request_line.find(' ');
+    const auto second_space = request_line.find(' ', first_space + 1);
+    const auto host_seperator = request_line.find('@', first_space + 1);
 
     if (first_space != std::string_view::npos && second_space != std::string_view::npos) {
         m_method = request_line.substr(0, first_space);
         m_method_enum = parse_method_enum(m_method);
         m_uri = request_line.substr(first_space + 1, host_seperator - first_space - 1);
         m_host = request_line.substr(host_seperator + 1, second_space - host_seperator - 1);
+
+        return ErrorCode::OK;
     }
+
+    return ErrorCode::BAD_REQUEST;
 }
 
-void SIPRequest::parse_pai() {
+ErrorCode SIPRequest::parse_pai() {
     const auto& pais = get_header("P-Asserted-Identity");
-    if (pais.size() == 0) {
+    if (pais.empty()) {
         pai_list.emplace_back(SIP_P_Header{"", ""});
-        return;
+        return ErrorCode::OK;
     }
 
     for (const auto& pai : pais) {
-        auto uri_begin = pai.find("sip:");
+        const auto uri_begin = pai.find("sip:");
         if (uri_begin == std::string_view::npos) {
-            std::cerr << "[SIPRequest::parse_pai()]: Malformed PAI header!" << std::endl;
-            return;
+            m_logger.write_log("[SIPRequest::parse_pai()]: Malformed PAI header, no sip-URI!");
+            return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
-        auto host_sep = pai.find('@', uri_begin + 4);
+        const auto host_sep = pai.find('@', uri_begin + 4);
         if (host_sep == std::string_view::npos) {
-            std::cerr << "[SIPRequest::parse_pai()]: Malformed PAI header!" << std::endl;
-            return;
+            m_logger.write_log("[SIPRequest::parse_pai()]: Malformed PAI header!");
+            return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
         auto line_end = pai.find('>', host_sep + 1);
         if (line_end == std::string_view::npos) {
             line_end = pai.find('\r');
         }
-        std::string_view uri = pai.substr(uri_begin + 4, host_sep - (uri_begin + 4));
-        std::string_view host = pai.substr(host_sep + 1, line_end - host_sep - 1);
+        const std::string_view uri = pai.substr(uri_begin + 4, host_sep - (uri_begin + 4));
+        const std::string_view host = pai.substr(host_sep + 1, line_end - host_sep - 1);
 
         pai_list.emplace_back(SIP_P_Header{uri, host});
     }
+
+    return ErrorCode::OK;
 }
 
-void SIPRequest::parse_ppi() {
+ErrorCode SIPRequest::parse_ppi() {
     const auto& ppis = get_header("p-preferred-identity");
-    if (ppis.size() == 0) {
+    if (ppis.empty()) {
         ppi_list.emplace_back(SIP_P_Header{"", ""});
-        return;
+        return ErrorCode::OK;
     }
 
     for (const auto& ppi : ppis) {
-        auto uri_begin = ppi.find("sip:");
+        const auto uri_begin = ppi.find("sip:");
         if (uri_begin == std::string_view::npos) {
-            std::cerr << "[SIPRequest::parse_ppi()]: Malformed PPI header!" << std::endl;
-            return;
+            m_logger.write_log("[SIPRequest::parse_ppi()]: Malformed PPI header, no sip-uri!");
+            return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
-        auto host_sep = ppi.find('@', uri_begin + 4);
+        const auto host_sep = ppi.find('@', uri_begin + 4);
         if (host_sep == std::string_view::npos) {
-            std::cerr << "[SIPRequest::parse_ppi()]: Malformed PPI header!" << std::endl;
-            return;
+            m_logger.write_log("[SIPRequest::parse_ppi()]: Malformed PPI header!");
+            return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
         auto line_end = ppi.find('>', host_sep + 1);
         if (line_end == std::string_view::npos) {
             line_end = ppi.find('\r');
         }
-        std::string_view uri = ppi.substr(uri_begin + 4, host_sep - (uri_begin + 4));
-        std::string_view host = ppi.substr(host_sep + 1, line_end - host_sep - 1);
+        const std::string_view uri = ppi.substr(uri_begin + 4, host_sep - (uri_begin + 4));
+        const std::string_view host = ppi.substr(host_sep + 1, line_end - host_sep - 1);
         ppi_list.emplace_back(SIP_P_Header{uri, host});
     }
+
+    return ErrorCode::OK;
 }
