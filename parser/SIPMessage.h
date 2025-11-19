@@ -62,7 +62,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "SIPLogWriter.h"
+#include "../logwriter/SIPLogWriter.h"
 
 
 struct SIP_P_Header {

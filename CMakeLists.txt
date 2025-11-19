@@ -4,12 +4,12 @@ project(sip_parser)
 set(CMAKE_CXX_STANDARD 20)
 
 add_executable(sip_parser main.cpp
-        SIPMessage.cpp
-        SIPMessage.h
-        SIPRequest.cpp
-        SIPResponse.cpp
-        SIPRequest.h
-        SIPResponse.h
-        SIPLogWriter.cpp
-        SIPLogWriter.h
+        parser/SIPMessage.cpp
+        parser/SIPMessage.h
+        parser/SIPRequest.cpp
+        parser/SIPResponse.cpp
+        parser/SIPRequest.h
+        parser/SIPResponse.h
+        logwriter/SIPLogWriter.cpp
+        logwriter/SIPLogWriter.h
 )

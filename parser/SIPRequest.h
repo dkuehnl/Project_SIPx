@@ -69,7 +69,7 @@
 #define SIP_PARSER_SIPREQUEST_H
 
 #include "SIPMessage.h"
-#include "SIPLogWriter.h"
+#include "../logwriter/SIPLogWriter.h"
 
 enum class SIPMethod {
     INVITE,

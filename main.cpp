@@ -1,9 +1,9 @@
 #include <iostream>
 #include <string>
 
-#include "sipmessage.h"
-#include "SIPRequest.h"
-#include "SIPResponse.h"
+#include "parser/SIPMessage.h"
+#include "parser/SIPRequest.h"
+#include "parser/SIPResponse.h"
 
 constexpr std::string_view INVITE =
     "INVITE sip:bob@ims.telekom.de SIP/2.0\r\n"
