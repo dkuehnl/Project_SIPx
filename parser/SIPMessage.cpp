@@ -107,17 +107,11 @@ std::vector<std::string_view> SIPMessage::parse_values(const std::vector<std::st
     return final_values;
 }
 
-SIPMessage::SIPMessage(std::string message, SIPLogWriter& logger, std::string source_ip, const std::uint16_t source_port)
-    : m_message(std::move(message)), m_logger(logger), m_source_ip(std::move(source_ip)), m_source_port(source_port) {
+SIPMessage::SIPMessage(std::string message, SIPLogWriter* logger)
+    : m_message(std::move(message)), m_logger(logger) {
 
     if (m_message.empty()) {
         throw std::invalid_argument("[SIPMessage.cpp] Message is empty");
-    }
-    if (m_source_ip.empty()) {
-        throw std::invalid_argument("[SIPMessage.cpp] No Source-IP detected");
-    }
-    if (m_source_port == 0) {
-        throw std::invalid_argument("[SIPMessage.cpp] Invalid Source-Port detected");
     }
 
     if (m_message.find("\r\n\r\n") == std::string::npos) {
@@ -151,6 +145,11 @@ bool SIPMessage::is_header_ascii(const std::string_view header) {
     return true;
 }
 
+void SIPMessage::log(const std::string& msg) const {
+    if (m_logger) {
+        m_logger->write_log(msg);
+    }
+}
 
 bool SIPMessage::parse_message() {
     const char* ptr = m_message.data();
@@ -161,7 +160,7 @@ bool SIPMessage::parse_message() {
         m_request_line = std::string_view(ptr, line_end - ptr);
         if (!is_value_ascii(m_request_line)) {
             m_parsing_status = ErrorCode::BAD_REQUEST;
-            m_logger.write_log("[SIPMessage::parse_message()] Invalid request-line");
+            log("[SIPMessage::parse_message()] Invalid request-line");
             return false;
         }
         ptr = line_end + 2;
@@ -187,7 +186,7 @@ bool SIPMessage::parse_message() {
 
             if (!is_header_ascii(name) || !is_value_ascii(value)) {
                 m_parsing_status = ErrorCode::BAD_REQUEST;
-                m_logger.write_log(std::format("[SIPMessage::parse_message()] Invalid message: {}", name));
+                log(std::format("[SIPMessage::parse_message()] Invalid message: {}", name));
                 break;
             }
 
@@ -203,7 +202,7 @@ bool SIPMessage::parse_message() {
     }
 
     if (m_parsing_status != ErrorCode::OK) {
-        m_logger.write_log("[SIPMessage::parse_message()] Parsing aported");
+        log("[SIPMessage::parse_message()] Parsing aported");
         return false;
     }
 
@@ -246,7 +245,7 @@ bool SIPMessage::parse_all() {
         sdp_content = content.substr(sip_end + 4);
         if (sdp_content.size() != content_length) {
             m_parsing_status = ErrorCode::LENGTH_REQUIRED;
-            m_logger.write_log("[SIPMessage::parse_all()] Incomplete Content");
+            log("[SIPMessage::parse_all()] Incomplete Content");
             return false;
         }
     }
@@ -265,34 +264,34 @@ const std::vector<std::string_view>& SIPMessage::get_header(const std::string_vi
 ErrorCode SIPMessage::parse_via() {
     const auto& vias = get_header("Via");
     if (vias.empty()) {
-        m_logger.write_log("[SIPMessage parse_via()]: Malformed SIP-Message, no VIA-Headers");
+        log("[SIPMessage parse_via()]: Malformed SIP-Message, no VIA-Headers");
         return ErrorCode::BAD_REQUEST;
     }
 
     for (const auto& via : vias) {
         const auto transport_begin = via.find("SIP/2.0/");
         if (transport_begin == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage parse_via()]: Malformed VIA-Header");
+            log("[SIPMessage parse_via()]: Malformed VIA-Header");
             return ErrorCode::BAD_REQUEST;
         }
         const auto uri_begin = via.find(' ', transport_begin + 3);
         if (uri_begin == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage parse_via()]: Malformed VIA-Header");
+            log("[SIPMessage parse_via()]: Malformed VIA-Header");
             return ErrorCode::BAD_REQUEST;
         }
         const auto port_sep = via.find(':', uri_begin + 1);
         if (port_sep == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage parse_via()]: Malformed VIA-Header");
+            log("[SIPMessage parse_via()]: Malformed VIA-Header");
             return ErrorCode::BAD_REQUEST;
         }
         const auto branch_begin = via.find("branch=");
         if (branch_begin == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage parse_via()]: Malformed VIA-Header");
+            log("[SIPMessage parse_via()]: Malformed VIA-Header");
             return ErrorCode::BAD_REQUEST;
         }
         const auto line_end = via.find('\r', branch_begin);
         if (line_end == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage parse_via()]: Malformed VIA-Header");
+            log("[SIPMessage parse_via()]: Malformed VIA-Header");
             return ErrorCode::BAD_REQUEST;
         }
 
@@ -317,19 +316,19 @@ ErrorCode SIPMessage::parse_via() {
 ErrorCode SIPMessage::parse_contact() {
     const auto& contacts = get_header("Contact");
     if (contacts.size() > 1) {
-        m_logger.write_log("[SIPMessage::parse_contact()]: More than one Contact found.");
+        log("[SIPMessage::parse_contact()]: More than one Contact found.");
         return ErrorCode::BAD_REQUEST;
     }
 
     for (const auto& contact : contacts) {
         if (contact.empty()) {
-            m_logger.write_log("[SIPMessage::parse_contact()]: No Contact-header found!");
+            log("[SIPMessage::parse_contact()]: No Contact-header found!");
             return ErrorCode::BAD_REQUEST;
         }
         const auto uri_begin = contact.find("sip:");
         const auto host_sep = contact.find('@', uri_begin);
         if (uri_begin == std::string_view::npos && host_sep == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage::parse_contact()]: Malformed Contact header!");
+            log("[SIPMessage::parse_contact()]: Malformed Contact header!");
             return ErrorCode::BAD_REQUEST;
         }
         const auto port_sep = contact.find(':', host_sep);
@@ -352,7 +351,7 @@ ErrorCode SIPMessage::parse_cseq() {
     const auto first_space = cseq_header.find(' ');
     const auto line_end = cseq_header.find('\r');
     if (first_space == std::string_view::npos || line_end == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_cseq()]: Malformed CSeq header!");
+        log("[SIPMessage::parse_cseq()]: Malformed CSeq header!");
         return ErrorCode::BAD_REQUEST;
     }
 
@@ -365,17 +364,17 @@ ErrorCode SIPMessage::parse_cseq() {
 ErrorCode SIPMessage::parse_to() {
     const auto first_sep = to_header.find("sip");
     if (first_sep == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_to()]: Malformed URI header!");
+        log("[SIPMessage::parse_to()]: Malformed URI header!");
         return ErrorCode::BAD_REQUEST ;
     }
     const auto host_sep = to_header.find('@', first_sep + 1);
     if (host_sep == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_to()]: Malformed URI header!");
+        log("[SIPMessage::parse_to()]: Malformed URI header!");
         return ErrorCode::BAD_REQUEST;
     }
     const auto line_end = to_header.find('\r', host_sep + 1);
     if (line_end == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_to()]: Malformed URI header!");
+        log("[SIPMessage::parse_to()]: Malformed URI header!");
         return ErrorCode::BAD_REQUEST;
     }
     const auto end_brack = to_header.find('>', host_sep + 1);
@@ -397,23 +396,23 @@ ErrorCode SIPMessage::parse_to() {
 ErrorCode SIPMessage::parse_from() {
     const auto first_sep = from_header.find("sip");
     if (first_sep == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_from()]: Malformed URI header, no sip: found!");
+        log("[SIPMessage::parse_from()]: Malformed URI header, no sip: found!");
         return ErrorCode::BAD_REQUEST;
     }
     const auto host_sep = from_header.find('@', first_sep + 1);
     if (host_sep == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_from()]: Malformed URI header, no @ found!");
+        log("[SIPMessage::parse_from()]: Malformed URI header, no @ found!");
         return ErrorCode::BAD_REQUEST;
     }
     const auto end_brack = from_header.find('>', host_sep + 1);
     const auto last_sep = from_header.find(';', end_brack != std::string_view::npos ? end_brack + 1 : host_sep + 1);
     if (last_sep == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_from()]: Malformed URI header, no end-limiter (; or >) found!");
+        log("[SIPMessage::parse_from()]: Malformed URI header, no end-limiter (; or >) found!");
         return ErrorCode::BAD_REQUEST;
     }
     const auto line_end = from_header.find('\r', last_sep + 1);
     if (line_end == std::string_view::npos) {
-        m_logger.write_log("[SIPMessage::parse_from()]: Malformed URI header, no line-end found!");
+        log("[SIPMessage::parse_from()]: Malformed URI header, no line-end found!");
         return ErrorCode::BAD_REQUEST;
     }
 
@@ -431,13 +430,13 @@ ErrorCode SIPMessage::parse_from() {
 ErrorCode SIPMessage::parse_list_headers(const std::string& header_name) {
     const auto& list = get_header(header_name);
     if (list.empty()) {
-        m_logger.write_log("[SIPMessage::parse_list_headers()]: No header with " + header_name + " found.");
+        log("[SIPMessage::parse_list_headers()]: No header with " + header_name + " found.");
         return ErrorCode::OK;
     }
 
     const auto it = handlers.find(header_name);
     if (it == handlers.end()) {
-        m_logger.write_log("[SIPMessage::parse_list_headers()]: No handler for header: " + header_name);
+        log("[SIPMessage::parse_list_headers()]: No handler for header: " + header_name);
         return ErrorCode::SERVER_INTERNAL_ERROR;
     }
 
@@ -452,7 +451,7 @@ ErrorCode SIPMessage::parse_list_headers(const std::string& header_name) {
 ErrorCode SIPMessage::parse_session_expire() {
     const auto& min_se_list = get_header("Min-SE");
     if (min_se_list.empty() || min_se_list.size() > 2) {
-        m_logger.write_log("[SIPMessage parse_session_expire()]: No Min-SE-Header or invalid");
+        log("[SIPMessage parse_session_expire()]: No Min-SE-Header or invalid");
     } else {
         for (const auto& value : min_se_list) {
             const auto line_end = value.find('\r');
@@ -461,7 +460,7 @@ ErrorCode SIPMessage::parse_session_expire() {
             try {
                 temp_int_val = static_cast<uint16_t>(std::stoi(std::string(temp_val)));
             } catch (const std::exception& e) {
-                m_logger.write_log(std::format("[SIPMessage::parse_session_expire()]: Invalid Min-SE-value: {}",e.what()));
+                log(std::format("[SIPMessage::parse_session_expire()]: Invalid Min-SE-value: {}",e.what()));
                 return ErrorCode::BAD_REQUEST;
             }
             min_se = temp_int_val;
@@ -470,7 +469,7 @@ ErrorCode SIPMessage::parse_session_expire() {
 
     const auto& session_expire = get_header("Session-Expires");
     if (session_expire.empty()) {
-        m_logger.write_log("[SIPMessage parse_session_expire()]: No Session-Expire");
+        log("[SIPMessage parse_session_expire()]: No Session-Expire");
         return ErrorCode::OK;
     }
 
@@ -479,7 +478,7 @@ ErrorCode SIPMessage::parse_session_expire() {
          const auto line_end = value.find('\r');
 
          if (line_end == std::string_view::npos) {
-            m_logger.write_log("[SIPMessage parse_session_expire()]: No Line-End found");
+            log("[SIPMessage parse_session_expire()]: No Line-End found");
             return ErrorCode::BAD_REQUEST;
          }
 
@@ -495,7 +494,7 @@ ErrorCode SIPMessage::parse_session_expire() {
          try {
              temp_timer_val = static_cast<uint16_t>(std::stoi(std::string(temp_timer)));
          } catch (const std::exception& e) {
-             m_logger.write_log(std::format("[SIPMessage::parse_session_expire()]: Invalid Refresh-Timer: {}", e.what()));
+             log(std::format("[SIPMessage::parse_session_expire()]: Invalid Refresh-Timer: {}", e.what()));
              return ErrorCode::BAD_REQUEST;
          }
          refresh_timer = temp_timer_val;
@@ -507,14 +506,14 @@ ErrorCode SIPMessage::parse_session_expire() {
 ErrorCode SIPMessage::parse_content() {
     const auto& list_content_length = get_header("Content-Length");
     if (list_content_length.size() != 1) {
-        m_logger.write_log("[SIPMessage::parse_content()]: Malformed SIP-Message, no valid Content-Length-Header");
+        log("[SIPMessage::parse_content()]: Malformed SIP-Message, no valid Content-Length-Header");
         return ErrorCode::LENGTH_REQUIRED;
     }
     uint16_t tmp_cont_length = 0;
     try {
         tmp_cont_length = static_cast<uint16_t>(std::stoi(std::string(list_content_length[0])));
     } catch (const std::exception& e) {
-        m_logger.write_log(std::format("[SIPMessage::parse_content()]: Invalid Content-Length: {}", e.what()));
+        log(std::format("[SIPMessage::parse_content()]: Invalid Content-Length: {}", e.what()));
         return ErrorCode::BAD_REQUEST;
     }
     content_length = tmp_cont_length;
@@ -526,7 +525,7 @@ ErrorCode SIPMessage::parse_content() {
 
     const auto& list_content_type = get_header("Content-Type");
     if (list_content_type.empty()) {
-        m_logger.write_log("[SIPMessage::parse_content()]: Content-Type missing");
+        log("[SIPMessage::parse_content()]: Content-Type missing");
         return ErrorCode::BAD_REQUEST;
     }
 
@@ -536,6 +535,6 @@ ErrorCode SIPMessage::parse_content() {
             return ErrorCode::OK;
         }
     }
-    m_logger.write_log("[SIPMessage::parse_content()]: No valid content-type found");
+    log("[SIPMessage::parse_content()]: No valid content-type found");
     return ErrorCode::UNSUPPORTED_MEDIA_TYPE;
 }

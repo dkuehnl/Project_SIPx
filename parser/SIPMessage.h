@@ -82,9 +82,7 @@ class SIPMessage {
 public:
     explicit SIPMessage(
         std::string message,
-        SIPLogWriter& logger,
-        std::string source_ip = "0.0.0.0",
-        std::uint16_t source_port = 5060
+        SIPLogWriter* logger = nullptr
         );
     virtual ~SIPMessage() = default;
 
@@ -127,10 +125,11 @@ public:
 
 
 protected:
+    void log(const std::string& msg) const;
     static bool is_value_ascii(std::string_view value);
     static bool is_header_ascii(std::string_view header);
     ErrorCode m_parsing_status = ErrorCode::OK;
-    SIPLogWriter& m_logger;
+    SIPLogWriter* m_logger;
 
     virtual bool parse_message();
     bool parse_all();
@@ -138,8 +137,6 @@ protected:
     using ParserFn = ErrorCode (SIPMessage::*)();
 
     std::string m_message;
-    std::string m_source_ip;
-    std::uint16_t m_source_port;
 
     std::string_view m_request_line;
     std::string_view from_header;
