@@ -73,8 +73,8 @@
 #include <chrono>
 #include <vector>
 
-SIPRequest::SIPRequest(std::string message, SIPLogWriter& logger, std::string source_ip, const uint16_t source_port)
-    : SIPMessage(std::move(message), logger, std::move(source_ip), source_port) {
+SIPRequest::SIPRequest(std::string message, SIPLogWriter* logger)
+    : SIPMessage(std::move(message), logger) {
 
     if (m_parsing_status == ErrorCode::OK) {
         SIPRequest::parse_message();
@@ -164,12 +164,12 @@ ErrorCode SIPRequest::parse_pai() {
     for (const auto& pai : pais) {
         const auto uri_begin = pai.find("sip:");
         if (uri_begin == std::string_view::npos) {
-            m_logger.write_log("[SIPRequest::parse_pai()]: Malformed PAI header, no sip-URI!");
+            log("[SIPRequest::parse_pai()]: Malformed PAI header, no sip-URI!");
             return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
         const auto host_sep = pai.find('@', uri_begin + 4);
         if (host_sep == std::string_view::npos) {
-            m_logger.write_log("[SIPRequest::parse_pai()]: Malformed PAI header!");
+            log("[SIPRequest::parse_pai()]: Malformed PAI header!");
             return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
         auto line_end = pai.find('>', host_sep + 1);
@@ -195,12 +195,12 @@ ErrorCode SIPRequest::parse_ppi() {
     for (const auto& ppi : ppis) {
         const auto uri_begin = ppi.find("sip:");
         if (uri_begin == std::string_view::npos) {
-            m_logger.write_log("[SIPRequest::parse_ppi()]: Malformed PPI header, no sip-uri!");
+            log("[SIPRequest::parse_ppi()]: Malformed PPI header, no sip-uri!");
             return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
         const auto host_sep = ppi.find('@', uri_begin + 4);
         if (host_sep == std::string_view::npos) {
-            m_logger.write_log("[SIPRequest::parse_ppi()]: Malformed PPI header!");
+            log("[SIPRequest::parse_ppi()]: Malformed PPI header!");
             return ErrorCode::UNSUPPORTED_URI_SCHEME;
         }
         auto line_end = ppi.find('>', host_sep + 1);

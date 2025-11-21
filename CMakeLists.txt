@@ -12,4 +12,8 @@ add_executable(Project_SIPx main.cpp
         parser/SIPResponse.h
         logwriter/SIPLogWriter.cpp
         logwriter/SIPLogWriter.h
+        app/SIPxApp.cpp
+        app/SIPxApp.h
+        parser/SIPParser.cpp
+        parser/SIPParser.h
 )

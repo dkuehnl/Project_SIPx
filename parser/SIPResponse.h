@@ -68,7 +68,7 @@
 
 class SIPResponse : public SIPMessage {
 public:
-    explicit SIPResponse(std::string message, SIPLogWriter& logger, std::string source_ip = "0.0.0.0", uint16_t source_port = 5060);
+    explicit SIPResponse(std::string message, SIPLogWriter* logger);
 
     uint16_t get_response_code() const { return response_code; }
     std::string_view get_response_type() const { return response_type; }

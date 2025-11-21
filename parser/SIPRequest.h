@@ -85,7 +85,7 @@ enum class SIPMethod {
 
 class SIPRequest : public SIPMessage {
 public:
-    explicit SIPRequest(std::string message, SIPLogWriter& logger, std::string source_ip = "0.0.0.0", uint16_t source_port = 5060);
+    explicit SIPRequest(std::string message, SIPLogWriter* logger);
 
     std::string_view method() const { return m_method; }
     std::string_view request_uri() const { return m_uri; }
