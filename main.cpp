@@ -1,9 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "parser/SIPMessage.h"
-#include "parser/SIPRequest.h"
-#include "parser/SIPResponse.h"
+#include "parser/SIPParser.h"
 #include "logwriter/SIPLogWriter.h"
 
 constexpr std::string_view INVITE =
@@ -78,17 +76,10 @@ int main() {
 
     try {
         auto logger = SIPLogWriter(R"(C:\Users\dkueh\Workspace\cpp\sip_engine\sip_parser)");
+        auto parser = SIPParser(&logger);
 
-        auto request = SIPRequest(std::string(INVITE), logger);
-        if (request.status() != ErrorCode::OK) {
-            std::cout << "Error: " << SIPLogWriter::parse_error_code(request.status()) << std::endl;
-            return 1;
-        } else {
-            std::cout << "INVITE: " << std::endl;
-            std::cout
-            << "SDP-Content: '" << request.sdp() << "'" << std::endl;
-        }
-
+        auto message = parser.parse_message(std::string(Response_180));
+        std::cout << message->get_from_uri() << std::endl;
 
         /*auto response_180 = SIPResponse(std::string(Response_180));
         std::cout << "Response 180:" << std::endl;
