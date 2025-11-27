@@ -63,7 +63,6 @@
 #include "SIPResponse.h"
 
 #include <format>
-#include <iostream>
 
 SIPResponse::SIPResponse(std::string message, SIPLogWriter* logger)
     : SIPMessage(std::move(message), logger) {

@@ -81,7 +81,7 @@ SIPRequest::SIPRequest(std::string message, SIPLogWriter* logger)
     }
 }
 
-SIPMethod SIPRequest::parse_method_enum(std::string_view method) {
+SIPMethod SIPRequest::parse_method_enum(const std::string_view method) {
     std::string upper(method);
     std::transform(upper.begin(), upper.end(), upper.begin(), toupper);
 

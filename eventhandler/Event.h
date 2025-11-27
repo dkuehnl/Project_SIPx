@@ -4,7 +4,6 @@
 
 #ifndef PROJECT_SIPX_EVENT_H
 #define PROJECT_SIPX_EVENT_H
-#include <any>
 
 enum class EventType {
     NETWORK_SOCKET_CREATED,
@@ -21,7 +20,9 @@ enum class EventType {
 
 struct Event {
     EventType type;
-    std::any data;
+    std::string* raw_msg = nullptr;
+    SIPMessage* parsed_msg = nullptr;
+    mutable bool ownership_claimed = false;
 };
 
 

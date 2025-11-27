@@ -1,8 +1,8 @@
 #include <iostream>
 #include <string>
 
+#include "app/SIPxApp.h"
 #include "parser/SIPParser.h"
-#include "logwriter/SIPLogWriter.h"
 
 constexpr std::string_view INVITE =
     "INVITE sip:bob@ims.telekom.de SIP/2.0\r\n"
@@ -73,14 +73,15 @@ constexpr std::string_view Response_200 =
 
 
 int main() {
+    ModuleFlags flags;
+    flags.parser = true;
 
     try {
-        auto logger = SIPLogWriter(R"(C:\Users\dkueh\Workspace\cpp\sip_engine\sip_parser)");
-        auto parser = SIPParser(&logger);
-
-        auto message = parser.parse_message(std::string(Response_180));
-        std::cout << message->get_from_uri() << std::endl;
-
+        const SIPxApp app(flags);
+        app.parse_raw_message(std::string(INVITE));
+        for (const auto& msg : app.get_messages()) {
+            std::cout << msg->from() << std::endl;
+        }
         /*auto response_180 = SIPResponse(std::string(Response_180));
         std::cout << "Response 180:" << std::endl;
         std::cout
@@ -98,5 +99,6 @@ int main() {
         std::cerr << e.what() << std::endl;
         return 1;
     }
+
     return 0;
 }

@@ -50,16 +50,34 @@
 
 #include "SIPParser.h"
 
-SIPParser::SIPParser(SIPLogWriter* logger) {
+#include "SIPRequest.h"
+#include "SIPResponse.h"
+
+SIPParser::SIPParser(EventDispatcher& disp, SIPLogWriter* logger)
+    : m_dispatcher(disp) {
     if (logger != nullptr) {
         m_logger = logger;
+    }
+
+    m_dispatcher.register_listener(this);
+}
+
+void SIPParser::on_event(const Event& evt) {
+    if (evt.type == EventType::RAW_MESSAGE_RECEIVED) {
+        std::string* sip_raw = evt.raw_msg;
+        auto parsed_message = parse_message(std::move(*sip_raw));
+
+        Event e2;
+        e2.type = EventType::MESSAGE_PARSED;
+        e2.parsed_msg = parsed_message.release();
+        e2.ownership_claimed = false;
+        m_dispatcher.dispatch(e2);
     }
 }
 
 bool SIPParser::is_response(const std::string_view sip_message) {
     const auto first_line_end = sip_message.find("\r\n");
-    std::string_view first_line = sip_message.substr(0, first_line_end);
-    if (first_line.starts_with("SIP/2.0")) {
+    if (const std::string_view first_line = sip_message.substr(0, first_line_end); first_line.starts_with("SIP/2.0")) {
         return false;
     }
     return true;
@@ -70,8 +88,7 @@ std::unique_ptr<SIPMessage> SIPParser::parse_message(std::string&& sip_message) 
     if (is_response(sip_message)) {
         m_paket_count++;
         return std::make_unique<SIPResponse>(std::move(sip_message), m_logger);
-    } else {
-        m_paket_count++;
-        return std::make_unique<SIPRequest>(std::move(sip_message), m_logger);
     }
+    m_paket_count++;
+    return std::make_unique<SIPRequest>(std::move(sip_message), m_logger);
 }

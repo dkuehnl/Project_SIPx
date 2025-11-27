@@ -16,4 +16,7 @@ add_executable(Project_SIPx main.cpp
         app/SIPxApp.h
         parser/SIPParser.cpp
         parser/SIPParser.h
+        eventhandler/EventDispatcher.h
+        eventhandler/Event.h
+        eventhandler/EventHandler.h
 )

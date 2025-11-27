@@ -5,10 +5,9 @@
 #ifndef PROJECT_SIPX_SIPXAPP_H
 #define PROJECT_SIPX_SIPXAPP_H
 
-#include <any>
-
 #include "../parser/SIPParser.h"
 #include "../logwriter/SIPLogWriter.h"
+#include "../eventhandler/EventDispatcher.h"
 
 struct ModuleFlags {
     bool network = false;
@@ -19,56 +18,26 @@ struct ModuleFlags {
     bool logwriter = false;
 };
 
-enum class EventType {
-    NETWORK_SOCKET_CREATED,
-    NETWORK_SOCKET_CLOSED,
-    RAW_MESSAGE_RECEIVED,
-    MESSAGE_PARSED,
-    SEND_MESSAGE,
-    TIME_TO_REGISTER,
-    INITIATE_CALL,
-    START_MEDIA,
-    SEND_MEDIA,
-    RECEIVED_MEDIA
-};
-
-struct Event {
-    EventType type;
-    std::any data;
-};
-
-class SIPxApp {
+class SIPxApp : EventHandler {
 public:
     explicit SIPxApp(ModuleFlags flags, const std::string& filepath = "");
+
+    EventDispatcher m_dispatcher;
+    void parse_raw_message(std::string&& raw_message) const;
+    void on_event(const Event& evt) override;
+
+    [[nodiscard]] const std::vector<std::unique_ptr<SIPMessage>>& get_messages() const { return m_msgs; }
 
 private:
     ModuleFlags m_flags;
     std::unique_ptr<SIPLogWriter> m_logger;
     std::unique_ptr<SIPParser> m_parser;
-    //SIPNetwork m_network;
-    //SIPMedia m_media;
-    //SIPReg m_reg;
-    //SIPCall m_call;
-};
+    //std::unique_ptr<SIPNetwork> m_network;
+    //std::unique_ptr<SIPMedia> m_media;
+    //std::unique_ptr<SIPReg> m_reg;
+    //std::unique_ptr<SIPCall> m_call;
 
-class IEventHandler {
-public:
-    virtual ~IEventHandler() = default;
-    virtual void onEvent(const Event& evt) = 0;
-};
-
-class EventDispatcher {
-public:
-    std::vector<IEventHandler*> listeners;
-    void registerListener(IEventHandler* l) {
-        listeners.push_back(l);
-    }
-
-    void dispatch(const Event& evt) const {
-        for (auto* l : listeners) {
-            l->onEvent(evt);
-        }
-    }
+    std::vector<std::unique_ptr<SIPMessage>> m_msgs;
 };
 
 #endif //PROJECT_SIPX_SIPXAPP_H

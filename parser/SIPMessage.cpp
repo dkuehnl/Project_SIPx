@@ -59,7 +59,6 @@
 
 #include <algorithm>
 #include <iostream>
-#include <ostream>
 #include <utility>
 #include <chrono>
 
@@ -84,7 +83,7 @@ std::vector<std::string_view> SIPMessage::parse_values(const std::vector<std::st
     for (std::string_view sv : list) {
         size_t start = 0;
         while (start < sv.size()) {
-            size_t pos = sv.find(',', start);
+            const size_t pos = sv.find(',', start);
 
             std::string_view token;
             if (pos == std::string_view::npos) {
@@ -155,8 +154,7 @@ bool SIPMessage::parse_message() {
     const char* ptr = m_message.data();
     const char* end = ptr + m_message.size();
 
-    const char* line_end = std::search(ptr, end, "\r\n", "\r\n" + 2);
-    if (line_end != end) {
+    if (const char* line_end = std::search(ptr, end, "\r\n", "\r\n" + 2); line_end != end) {
         m_request_line = std::string_view(ptr, line_end - ptr);
         if (!is_value_ascii(m_request_line)) {
             m_parsing_status = ErrorCode::BAD_REQUEST;
@@ -170,13 +168,12 @@ bool SIPMessage::parse_message() {
         const char* next_line = std::search(ptr, end, "\r\n", "\r\n" + 2);
         if (next_line == ptr || next_line == end) break;
 
-        const char* colon = std::find(ptr, next_line, ':');
-        if (colon != next_line) {
+        if (const char* colon = std::find(ptr, next_line, ':'); colon != next_line) {
             std::string_view name(ptr, colon - ptr);
             std::string_view value(colon + 1, next_line - colon);
             while (!value.empty() && value.front() == ' ') value.remove_prefix(1);
 
-            auto cmp = [](std::string_view a, std::string_view b) {
+            auto cmp = [](const std::string_view a, const std::string_view b) {
                 if (a.size() != b.size()) return false;
                 for (size_t i = 0; i < a.size(); ++i) {
                     if (std::tolower(a[i]) != std::tolower(b[i])) return false;
@@ -253,9 +250,8 @@ bool SIPMessage::parse_all() {
     return true;
 }
 const std::vector<std::string_view>& SIPMessage::get_header(const std::string_view header_value) const {
-    static const std::vector<std::string_view> empty;
-    auto element = m_headers.find(header_value);
-    if (element != m_headers.end()) {
+    static constexpr std::vector<std::string_view> empty;
+    if (const auto element = m_headers.find(header_value); element != m_headers.end()) {
         return element->second;
     }
     return empty;
@@ -449,8 +445,7 @@ ErrorCode SIPMessage::parse_list_headers(const std::string& header_name) {
 }
 
 ErrorCode SIPMessage::parse_session_expire() {
-    const auto& min_se_list = get_header("Min-SE");
-    if (min_se_list.empty() || min_se_list.size() > 2) {
+    if (const auto& min_se_list = get_header("Min-SE"); min_se_list.empty() || min_se_list.size() > 2) {
         log("[SIPMessage parse_session_expire()]: No Min-SE-Header or invalid");
     } else {
         for (const auto& value : min_se_list) {

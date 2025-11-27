@@ -54,17 +54,20 @@
 #include <memory>
 
 #include "SIPMessage.h"
-#include "SIPRequest.h"
-#include "SIPResponse.h"
+#include "../eventhandler/EventHandler.h"
+#include "../eventhandler/EventDispatcher.h"
 #include "../logwriter/SIPLogWriter.h"
 
-class SIPParser {
+class SIPParser : public EventHandler {
 public:
-    explicit SIPParser(SIPLogWriter* logger = nullptr);
+    explicit SIPParser(EventDispatcher& disp, SIPLogWriter* logger = nullptr);
     std::unique_ptr<SIPMessage> parse_message(std::string&& sip_message);
-    unsigned int get_paket_count() const { return m_paket_count; }
+    [[nodiscard]] unsigned int get_paket_count() const { return m_paket_count; }
+
+    void on_event(const Event& evt) override;
 
 private:
+    EventDispatcher& m_dispatcher;
     SIPLogWriter* m_logger;
     unsigned int m_paket_count = 0;
 
