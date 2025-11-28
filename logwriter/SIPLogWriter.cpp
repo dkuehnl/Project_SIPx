@@ -42,9 +42,10 @@
 
 #include "SIPLogWriter.h"
 
+
+#include <fstream>
 #include <iostream>
 #include <ostream>
-#include <utility>
 
 static constexpr std::string_view error_names[] = {
     "OK",
@@ -65,9 +66,69 @@ static constexpr std::string_view error_names[] = {
     "SERVICE_UNAVAILABLE"
 };
 
-SIPLogWriter::SIPLogWriter(std::string filepath)
-    : m_filepath(std::move(filepath)) {
+SIPLogWriter::SIPLogWriter(const std::string &filepath, EventDispatcher* dispatcher) : m_dispatcher(dispatcher){
+    if (m_dispatcher != nullptr) {
+        m_dispatcher->register_listener(this);
+    }
 
+    if (!check_prepare_filepath(filepath)) {
+        throw std::runtime_error("Invalid filepath");
+    }
+}
+
+void SIPLogWriter::on_event(const Event &evt) {
+    if (evt.type == EventType::LOG_MESSAGE) {
+        write_log(evt.log_message);
+    }
+}
+
+
+bool SIPLogWriter::check_prepare_filepath(const std::string &input) {
+    if (!is_valid_path(input)) {
+        return false;
+    }
+
+    const std::filesystem::path p(input);
+    const std::filesystem::path dir = p.has_filename() ? p.parent_path() : p;
+
+    if (dir.empty()) {
+        return false;
+    }
+    if (!dir_exists(dir)) {
+        return false;
+    }
+    if (!can_write_to_dir(dir)) {
+        return false;
+    }
+
+    m_filepath = dir;
+    return true;
+}
+
+bool SIPLogWriter::is_valid_path(const std::string &filepath) {
+    std::error_code ec;
+    std::filesystem::path p(filepath);
+
+    auto st = std::filesystem::status(p, ec);
+    return !ec;
+}
+
+bool SIPLogWriter::dir_exists(const std::filesystem::path &dir) {
+    std::error_code ec;
+    return std::filesystem::exists(dir, ec) && std::filesystem::is_directory(dir, ec);
+}
+
+bool SIPLogWriter::can_write_to_dir(const std::filesystem::path& dir) {
+    const std::filesystem::path test_file = dir / ".__write_test__.tmp";
+    std::ofstream ofs(test_file.string(), std::ios::out | std::ios::app);
+
+    if (!ofs.is_open()) {
+        return false;
+    }
+
+    ofs.close();
+    std::filesystem::remove(test_file);
+    return true;
 }
 
 void SIPLogWriter::write_log(const std::string_view msg) {

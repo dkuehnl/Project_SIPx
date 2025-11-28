@@ -43,7 +43,11 @@
 
 #ifndef SIP_PARSER_SIPLOGWRITER_H
 #define SIP_PARSER_SIPLOGWRITER_H
+
 #include <string>
+#include <filesystem>
+#include "../eventhandler/EventHandler.h"
+#include "../eventhandler/EventDispatcher.h"
 
 enum class ErrorCode {
     OK,
@@ -64,15 +68,23 @@ enum class ErrorCode {
     SERVICE_UNAVAILABLE
 };
 
-class SIPLogWriter {
+class SIPLogWriter : public EventHandler {
 public:
-    explicit SIPLogWriter(std::string filepath);
+    explicit SIPLogWriter(const std::string &filepath, EventDispatcher* dispatcher = nullptr);
 
-    void write_log(std::string_view msg);
+    void write_log(const std::string_view msg);
     static std::string_view parse_error_code(ErrorCode code);
 
+    void on_event(const Event& evt) override;
+
 private:
-    std::string m_filepath;
+    bool check_prepare_filepath(const std::string& input);
+    static bool can_write_to_dir(const std::filesystem::path& dir);
+    static bool is_valid_path(const std::string& filepath);
+    static bool dir_exists(const std::filesystem::path& dir);
+
+    std::filesystem::path m_filepath;
+    EventDispatcher* m_dispatcher = nullptr;
 };
 
 

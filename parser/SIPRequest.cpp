@@ -73,8 +73,8 @@
 #include <chrono>
 #include <vector>
 
-SIPRequest::SIPRequest(std::string message, SIPLogWriter* logger)
-    : SIPMessage(std::move(message), logger) {
+SIPRequest::SIPRequest(std::string message, SIPLogWriter* logger, EventDispatcher* dispatcher)
+    : SIPMessage(std::move(message), logger, dispatcher) {
 
     if (m_parsing_status == ErrorCode::OK) {
         SIPRequest::parse_message();

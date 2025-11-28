@@ -4,21 +4,19 @@
 
 #include "SIPxApp.h"
 
-#include <iostream>
 
 SIPxApp::SIPxApp(const ModuleFlags flags, const std::string& filepath)
     : m_flags(flags) {
     if (m_flags.logwriter) {
-        if (filepath.empty()) {
-            std::cerr << "Invalid instantiation, LogWriter activated, but no filepath provided." << std::endl;
-            return;
+        try {
+            m_logger = std::make_unique<SIPLogWriter>(filepath);
+        } catch (const std::exception& e) {
+
         }
-        m_logger = std::make_unique<SIPLogWriter>(filepath);
     }
-    SIPLogWriter* logger = m_logger.get();
 
     if (m_flags.parser) {
-        m_parser = std::make_unique<SIPParser>(m_dispatcher, logger);
+        m_parser = std::make_unique<SIPParser>(&m_dispatcher);
     }
     m_dispatcher.register_listener(this);
 }

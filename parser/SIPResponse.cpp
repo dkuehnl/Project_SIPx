@@ -64,8 +64,8 @@
 
 #include <format>
 
-SIPResponse::SIPResponse(std::string message, SIPLogWriter* logger)
-    : SIPMessage(std::move(message), logger) {
+SIPResponse::SIPResponse(std::string message, SIPLogWriter* logger, EventDispatcher* dispatcher)
+    : SIPMessage(std::move(message), logger, dispatcher) {
 
     if (m_parsing_status == ErrorCode::OK) {
         SIPResponse::parse_message();

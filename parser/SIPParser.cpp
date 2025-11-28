@@ -53,13 +53,11 @@
 #include "SIPRequest.h"
 #include "SIPResponse.h"
 
-SIPParser::SIPParser(EventDispatcher& disp, SIPLogWriter* logger)
-    : m_dispatcher(disp) {
-    if (logger != nullptr) {
-        m_logger = logger;
+SIPParser::SIPParser(EventDispatcher* disp, SIPLogWriter* logger)
+    : m_dispatcher(disp), m_logger(logger) {
+    if (disp != nullptr) {
+        m_dispatcher->register_listener(this);
     }
-
-    m_dispatcher.register_listener(this);
 }
 
 void SIPParser::on_event(const Event& evt) {
@@ -71,7 +69,7 @@ void SIPParser::on_event(const Event& evt) {
         e2.type = EventType::MESSAGE_PARSED;
         e2.parsed_msg = parsed_message.release();
         e2.ownership_claimed = false;
-        m_dispatcher.dispatch(e2);
+        m_dispatcher->dispatch(e2);
     }
 }
 
@@ -87,8 +85,8 @@ bool SIPParser::is_response(const std::string_view sip_message) {
 std::unique_ptr<SIPMessage> SIPParser::parse_message(std::string&& sip_message) {
     if (is_response(sip_message)) {
         m_paket_count++;
-        return std::make_unique<SIPResponse>(std::move(sip_message), m_logger);
+        return std::make_unique<SIPResponse>(std::move(sip_message), m_logger, m_dispatcher);
     }
     m_paket_count++;
-    return std::make_unique<SIPRequest>(std::move(sip_message), m_logger);
+    return std::make_unique<SIPRequest>(std::move(sip_message), m_logger, m_dispatcher);
 }

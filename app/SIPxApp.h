@@ -18,7 +18,7 @@ struct ModuleFlags {
     bool logwriter = false;
 };
 
-class SIPxApp : EventHandler {
+class SIPxApp : public EventHandler {
 public:
     explicit SIPxApp(ModuleFlags flags, const std::string& filepath = "");
 

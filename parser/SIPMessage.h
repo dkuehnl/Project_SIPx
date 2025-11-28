@@ -57,12 +57,13 @@
 #ifndef SIP_PARSER_SIPMESSAGE_H
 #define SIP_PARSER_SIPMESSAGE_H
 
-#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "../logwriter/SIPLogWriter.h"
+#include "../eventhandler/EventHandler.h"
+#include "../eventhandler/EventDispatcher.h"
 
 
 struct SIP_P_Header {
@@ -78,11 +79,12 @@ struct SIP_VIA_Header {
 };
 
 
-class SIPMessage {
+class SIPMessage : EventHandler {
 public:
     explicit SIPMessage(
         std::string message,
-        SIPLogWriter* logger = nullptr
+        SIPLogWriter* logger = nullptr,
+        EventDispatcher* dispatcher = nullptr
         );
     virtual ~SIPMessage() = default;
 
@@ -123,13 +125,15 @@ public:
     uint16_t get_content_length() const { return content_length; }
     std::string_view get_content_type() const { return content_type; }
 
+    void on_event(const Event &evt) override;
 
 protected:
-    void log(const std::string& msg) const;
+    void log(std::string_view msg) const;
     static bool is_value_ascii(std::string_view value);
     static bool is_header_ascii(std::string_view header);
     ErrorCode m_parsing_status = ErrorCode::OK;
-    SIPLogWriter* m_logger;
+    SIPLogWriter* m_logger = nullptr;
+    EventDispatcher* m_dispatcher = nullptr;
 
     virtual bool parse_message();
     bool parse_all();

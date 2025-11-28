@@ -68,7 +68,7 @@
 
 class SIPResponse : public SIPMessage {
 public:
-    explicit SIPResponse(std::string message, SIPLogWriter* logger);
+    explicit SIPResponse(std::string message, SIPLogWriter* logger = nullptr, EventDispatcher* dispatcher = nullptr);
 
     uint16_t get_response_code() const { return response_code; }
     std::string_view get_response_type() const { return response_type; }

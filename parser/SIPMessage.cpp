@@ -106,8 +106,8 @@ std::vector<std::string_view> SIPMessage::parse_values(const std::vector<std::st
     return final_values;
 }
 
-SIPMessage::SIPMessage(std::string message, SIPLogWriter* logger)
-    : m_message(std::move(message)), m_logger(logger) {
+SIPMessage::SIPMessage(std::string message, SIPLogWriter* logger, EventDispatcher* dispatcher)
+    : m_message(std::move(message)), m_logger(logger), m_dispatcher(dispatcher){
 
     if (m_message.empty()) {
         throw std::invalid_argument("[SIPMessage.cpp] Message is empty");
@@ -144,10 +144,20 @@ bool SIPMessage::is_header_ascii(const std::string_view header) {
     return true;
 }
 
-void SIPMessage::log(const std::string& msg) const {
+void SIPMessage::log(std::string_view msg) const {
+    if (m_dispatcher) {
+        Event evt;
+        evt.type = EventType::LOG_MESSAGE;
+        evt.log_message = msg;
+        m_dispatcher->dispatch(evt);
+    }
     if (m_logger) {
         m_logger->write_log(msg);
     }
+}
+
+void SIPMessage::on_event(const Event &evt) {
+
 }
 
 bool SIPMessage::parse_message() {
