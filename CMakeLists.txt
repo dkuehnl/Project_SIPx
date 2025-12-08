@@ -19,4 +19,9 @@ add_executable(Project_SIPx main.cpp
         eventhandler/EventDispatcher.h
         eventhandler/Event.h
         eventhandler/EventHandler.h
+        network/platform/socket_base.h
+        network/platform/WindowsSocket.cpp
+        network/platform/WindowsSocket.h
+        network/SIPNetwork.cpp
+        network/SIPNetwork.h
 )

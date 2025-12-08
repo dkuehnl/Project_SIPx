@@ -75,9 +75,10 @@ constexpr std::string_view Response_200 =
 int main() {
     ModuleFlags flags;
     flags.parser = true;
+    flags.logwriter = true;
 
     try {
-        const SIPxApp app(flags);
+        const SIPxApp app(flags, "C:\\Users\\dkueh");
         app.parse_raw_message(std::string(INVITE));
         for (const auto& msg : app.get_messages()) {
             std::cout << msg->from() << std::endl;
