@@ -28,3 +28,4 @@ If a flag is set to `true`, the corresponding module is initialized and made ava
 
 By default, **all modules are disabled**, ensuring that nothing is initialized behind your back.
 This makes the module ideal for developers who want fine-grained control and prefer enabling features explicitly.
+The communication between the modules is handled by a Event-Driven-Design, details can be found in the `eventhandler`-folder. 

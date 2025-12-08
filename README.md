@@ -28,6 +28,7 @@ The following modules will be available in the final version:
 - **Media Handling** (`/media`)
 - **Core Application** (`/app`)
 - **Network Module** (`/network`)
+- **Event-Handler** (`/eventhandler`)
 
 Each module is fully standalone and can be extracted and integrated into other projects.  
 (Some minor modifications might be required depending on your setup.)
@@ -38,15 +39,16 @@ Additional details for each module can be found in their respective subdirectori
 
 ## Roadmap
 
-| Module    | Status        |
-|-----------|---------------|
-| Parser    | ✔️ done        |
-| Logwriter | 🔧 in progress |
-| Call      | ❌ not started |
-| Register  | ❌ not started |
-| Media     | ❌ not started |
-| Network   | ❌ not started |
-| App       | 🔧 in progress |
+| Module       | Status         |
+|--------------|----------------|
+| Parser       | ✔️ done        |
+| Logwriter    | 🔧 in progress |
+| Call         | ❌ not started  |
+| Register     | ❌ not started  |
+| Media        | ❌ not started  |
+| Network      | ❌ not started  |
+| App          | 🔧 in progress |
+| EventHandler | ✔️ done        | 
 
 ---
 

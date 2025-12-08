@@ -1,4 +1,4 @@
-# `parser/` -- SIP Parser Module
+# Parser
 
 ## Overview
 

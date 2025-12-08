@@ -4,6 +4,8 @@
 
 #include "SIPxApp.h"
 
+#include <iostream>
+
 
 SIPxApp::SIPxApp(const ModuleFlags flags, const std::string& filepath)
     : m_flags(flags) {
@@ -11,7 +13,7 @@ SIPxApp::SIPxApp(const ModuleFlags flags, const std::string& filepath)
         try {
             m_logger = std::make_unique<SIPLogWriter>(filepath);
         } catch (const std::exception& e) {
-
+            std::cerr << e.what() << std::endl;
         }
     }
 
