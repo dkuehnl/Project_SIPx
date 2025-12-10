@@ -53,11 +53,13 @@
 
 #ifndef PROJECT_SIPX_EVENT_H
 #define PROJECT_SIPX_EVENT_H
+#include <cstdint>
 
 
 class SIPMessage;
 
 enum class EventType {
+    CREATE_NETWORK_SOCKET,
     NETWORK_SOCKET_CREATED,
     NETWORK_SOCKET_CLOSED,
     RAW_MESSAGE_RECEIVED,
@@ -77,6 +79,13 @@ struct Event {
     std::string* raw_msg = nullptr;
     SIPMessage* parsed_msg = nullptr;
     mutable bool ownership_claimed = false;
+
+    //Network-related fields
+    std::string dest_ip{};
+    uint16_t dest_port = 0;
+    uint16_t source_port = 0;
+    bool use_tcp = true;
+    intptr_t socket_handle = 0;
 };
 
 

@@ -25,3 +25,7 @@ add_executable(Project_SIPx main.cpp
         network/SIPNetwork.cpp
         network/SIPNetwork.h
 )
+
+if (WIN32)
+    target_link_libraries(Project_SIPx PRIVATE ws2_32)
+endif()

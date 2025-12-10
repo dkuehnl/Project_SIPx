@@ -26,7 +26,8 @@ public:
     int recv_from(void* buffer, size_t max_len, char* source_ip, uint16_t* source_port) override;
     void close() override;
 
-    int get_last_error() override { return m_error; }
+    int get_last_error() const override { return m_error; }
+    intptr_t get_handle() const override { return static_cast<intptr_t>(m_socket); }
 
 private:
     SOCKET m_socket = INVALID_SOCKET;
