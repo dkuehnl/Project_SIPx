@@ -20,6 +20,10 @@ SIPxApp::SIPxApp(const ModuleFlags flags, const std::string& filepath)
     if (m_flags.parser) {
         m_parser = std::make_unique<SIPParser>(&m_dispatcher);
     }
+
+    if (m_flags.network) {
+        m_network = std::make_unique<SIPNetwork>(&m_dispatcher);
+    }
     m_dispatcher.register_listener(this);
 }
 

@@ -76,6 +76,7 @@ int main() {
     ModuleFlags flags;
     flags.parser = true;
     flags.logwriter = true;
+    flags.network = true;
 
     try {
         const SIPxApp app(flags, "C:\\Users\\dkueh");
