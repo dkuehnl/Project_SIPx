@@ -44,9 +44,9 @@ Additional details for each module can be found in their respective subdirectori
 | Parser       | ✔️ done        |
 | Logwriter    | 🔧 in progress |
 | Call         | ❌ not started  |
-| Register     | ❌ not started  |
+| Register     | 🔧 in progress  |
 | Media        | ❌ not started  |
-| Network      | ❌ not started  |
+| Network      | 🔧 in progress  |
 | App          | 🔧 in progress |
 | EventHandler | ✔️ done        | 
 
