@@ -139,7 +139,7 @@ void SIPNetwork::log(const std::string& context) const {
     }
 }
 
-void SIPNetwork::on_event(const Event& evt) {
+void SIPNetwork::on_event(Event& evt) {
     std::lock_guard<std::mutex> lock(m_event_mutex);
     m_event_queue.push(evt);
 }
