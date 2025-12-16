@@ -54,6 +54,9 @@
 #ifndef PROJECT_SIPX_EVENT_H
 #define PROJECT_SIPX_EVENT_H
 #include <cstdint>
+#include <string>
+#include <string_view>
+#include "../app/SIPxApp.h"
 
 
 class SIPMessage;
@@ -61,6 +64,7 @@ class SIPMessage;
 enum class EventType {
     CREATE_NETWORK_SOCKET,
     NETWORK_SOCKET_CREATED,
+    NETWORK_FAILED,
     NETWORK_SOCKET_CLOSED,
     RAW_MESSAGE_RECEIVED,
     MESSAGE_PARSED,
@@ -73,12 +77,43 @@ enum class EventType {
     LOG_MESSAGE
 };
 
+struct SIPConnection {
+    /*** network-settings ***/
+    intptr_t socket_id;
+    bool tcp = true;
+    bool socket_active = false;
+
+    /*** dns-settings ***/
+    std::string fqdn;
+    bool is_resolved = false;
+    uint16_t dns_ttl = 0;
+    std::string prio10_ip;
+    std::string prio20_ip;
+    std::string prio30_ip;
+
+    /*** register-state ***/
+    bool registered = false;
+    std::string registered_uri {};
+    std::string password {};
+    std::string domain {};
+    uint16_t reg_expire = 0;
+
+    /*** call-state ***/
+    bool call_active = false;
+};
+
 struct Event {
     EventType type;
     std::string_view log_message{};
+
+    /*** SIP-payload related ***/
     std::string* raw_msg = nullptr;
-    SIPMessage* parsed_msg = nullptr;
+    SIPMessage* raw_sip_message = nullptr;
+    std::unique_ptr<SIPMessage> parsed_msg;
     mutable bool ownership_claimed = false;
+
+    /*** Connection-related ***/
+    SIPConnection* connection;
 
     //Network-related fields
     std::string dest_ip{};
