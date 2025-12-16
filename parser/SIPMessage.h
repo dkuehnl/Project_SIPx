@@ -90,9 +90,10 @@ public:
 
     ErrorCode status() const { return m_parsing_status; }
     std::string_view request_line() const { return m_request_line; }
-    std::string_view from() const { return from_header; }
-    std::string_view to() const { return to_header; }
-    std::string_view cseq() const { return cseq_header; }
+    std::string_view from() const { return from_value; }
+    std::string_view to() const { return to_value; }
+    std::string_view cseq() const { return cseq_value; }
+    std::string_view call_id() const { return call_id_value; }
     std::string_view sdp() const { return sdp_content; }
     const std::vector<std::string_view>& get_header(std::string_view header_value) const;
 
@@ -125,7 +126,7 @@ public:
     uint16_t get_content_length() const { return content_length; }
     std::string_view get_content_type() const { return content_type; }
 
-    void on_event(const Event &evt) override;
+    void on_event(Event &evt) override;
 
 protected:
     void log(std::string_view msg) const;
@@ -143,9 +144,10 @@ protected:
     std::string m_message;
 
     std::string_view m_request_line;
-    std::string_view from_header;
-    std::string_view to_header;
-    std::string_view cseq_header;
+    std::string_view from_value;
+    std::string_view to_value;
+    std::string_view cseq_value;
+    std::string_view call_id_value;
     std::string_view sdp_content;
     std::unordered_map<std::string_view, std::vector<std::string_view>> m_headers;
 

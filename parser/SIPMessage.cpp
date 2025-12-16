@@ -156,7 +156,7 @@ void SIPMessage::log(std::string_view msg) const {
     }
 }
 
-void SIPMessage::on_event(const Event &evt) {
+void SIPMessage::on_event(Event &evt) {
 
 }
 
@@ -197,9 +197,10 @@ bool SIPMessage::parse_message() {
                 break;
             }
 
-            if (cmp(name, "From")) from_header = value;
-            else if (cmp(name, "To")) to_header = value;
-            else if (cmp(name, "CSeq")) cseq_header = value;
+            if (cmp(name, "From")) from_value = value;
+            else if (cmp(name, "To")) to_value = value;
+            else if (cmp(name, "CSeq")) cseq_value = value;
+            else if (cmp(name, "Call-ID")) call_id_value = value;
             else {
                 auto& vec = m_headers[name];
                 vec.push_back(value);
@@ -354,81 +355,81 @@ ErrorCode SIPMessage::parse_contact() {
 
 
 ErrorCode SIPMessage::parse_cseq() {
-    const auto first_space = cseq_header.find(' ');
-    const auto line_end = cseq_header.find('\r');
+    const auto first_space = cseq_value.find(' ');
+    const auto line_end = cseq_value.find('\r');
     if (first_space == std::string_view::npos || line_end == std::string_view::npos) {
         log("[SIPMessage::parse_cseq()]: Malformed CSeq header!");
         return ErrorCode::BAD_REQUEST;
     }
 
-    cseq_nr = cseq_header.substr(0, first_space);
-    cseq_typ = cseq_header.substr(first_space + 1, line_end - first_space - 1);
+    cseq_nr = cseq_value.substr(0, first_space);
+    cseq_typ = cseq_value.substr(first_space + 1, line_end - first_space - 1);
 
     return ErrorCode::OK;
 }
 
 ErrorCode SIPMessage::parse_to() {
-    const auto first_sep = to_header.find("sip");
+    const auto first_sep = to_value.find("sip");
     if (first_sep == std::string_view::npos) {
         log("[SIPMessage::parse_to()]: Malformed URI header!");
         return ErrorCode::BAD_REQUEST ;
     }
-    const auto host_sep = to_header.find('@', first_sep + 1);
+    const auto host_sep = to_value.find('@', first_sep + 1);
     if (host_sep == std::string_view::npos) {
         log("[SIPMessage::parse_to()]: Malformed URI header!");
         return ErrorCode::BAD_REQUEST;
     }
-    const auto line_end = to_header.find('\r', host_sep + 1);
+    const auto line_end = to_value.find('\r', host_sep + 1);
     if (line_end == std::string_view::npos) {
         log("[SIPMessage::parse_to()]: Malformed URI header!");
         return ErrorCode::BAD_REQUEST;
     }
-    const auto end_brack = to_header.find('>', host_sep + 1);
-    const auto last_sep = to_header.find(';', end_brack != std::string_view::npos ? end_brack + 1 : host_sep + 1);
+    const auto end_brack = to_value.find('>', host_sep + 1);
+    const auto last_sep = to_value.find(';', end_brack != std::string_view::npos ? end_brack + 1 : host_sep + 1);
 
 
-    to_uri = to_header.substr(first_sep + 4, host_sep - (first_sep + 4));
+    to_uri = to_value.substr(first_sep + 4, host_sep - (first_sep + 4));
     if (last_sep == std::string_view::npos) {
         to_tag = {};
-        to_host = to_header.substr(host_sep + 1, end_brack != std::string_view::npos ? end_brack - host_sep - 1 : line_end - host_sep - 1);
+        to_host = to_value.substr(host_sep + 1, end_brack != std::string_view::npos ? end_brack - host_sep - 1 : line_end - host_sep - 1);
     } else {
-        to_host = to_header.substr(host_sep + 1, end_brack != std::string_view::npos ? end_brack - host_sep - 1 : last_sep - host_sep - 1);
-        to_tag = to_header.substr(last_sep + 1, line_end - last_sep - 1);
+        to_host = to_value.substr(host_sep + 1, end_brack != std::string_view::npos ? end_brack - host_sep - 1 : last_sep - host_sep - 1);
+        to_tag = to_value.substr(last_sep + 1, line_end - last_sep - 1);
     }
 
     return ErrorCode::OK;
 }
 
 ErrorCode SIPMessage::parse_from() {
-    const auto first_sep = from_header.find("sip");
+    const auto first_sep = from_value.find("sip");
     if (first_sep == std::string_view::npos) {
         log("[SIPMessage::parse_from()]: Malformed URI header, no sip: found!");
         return ErrorCode::BAD_REQUEST;
     }
-    const auto host_sep = from_header.find('@', first_sep + 1);
+    const auto host_sep = from_value.find('@', first_sep + 1);
     if (host_sep == std::string_view::npos) {
         log("[SIPMessage::parse_from()]: Malformed URI header, no @ found!");
         return ErrorCode::BAD_REQUEST;
     }
-    const auto end_brack = from_header.find('>', host_sep + 1);
-    const auto last_sep = from_header.find(';', end_brack != std::string_view::npos ? end_brack + 1 : host_sep + 1);
+    const auto end_brack = from_value.find('>', host_sep + 1);
+    const auto last_sep = from_value.find(';', end_brack != std::string_view::npos ? end_brack + 1 : host_sep + 1);
     if (last_sep == std::string_view::npos) {
         log("[SIPMessage::parse_from()]: Malformed URI header, no end-limiter (; or >) found!");
         return ErrorCode::BAD_REQUEST;
     }
-    const auto line_end = from_header.find('\r', last_sep + 1);
+    const auto line_end = from_value.find('\r', last_sep + 1);
     if (line_end == std::string_view::npos) {
         log("[SIPMessage::parse_from()]: Malformed URI header, no line-end found!");
         return ErrorCode::BAD_REQUEST;
     }
 
-    from_uri = from_header.substr(first_sep + 4, host_sep - (first_sep + 4) );
+    from_uri = from_value.substr(first_sep + 4, host_sep - (first_sep + 4) );
     if (end_brack != std::string_view::npos) {
-        from_host = from_header.substr(host_sep + 1, end_brack - host_sep - 1);
+        from_host = from_value.substr(host_sep + 1, end_brack - host_sep - 1);
     } else {
-        from_host = from_header.substr(host_sep + 1, last_sep - host_sep - 1);
+        from_host = from_value.substr(host_sep + 1, last_sep - host_sep - 1);
     }
-    from_tag = from_header.substr(last_sep + 1, line_end - last_sep - 1);
+    from_tag = from_value.substr(last_sep + 1, line_end - last_sep - 1);
 
     return ErrorCode::OK;
 }
