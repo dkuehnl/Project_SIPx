@@ -76,7 +76,7 @@ SIPLogWriter::SIPLogWriter(const std::string &filepath, EventDispatcher* dispatc
     }
 }
 
-void SIPLogWriter::on_event(const Event &evt) {
+void SIPLogWriter::on_event(Event &evt) {
     if (evt.type == EventType::LOG_MESSAGE) {
         write_log(evt.log_message);
     }

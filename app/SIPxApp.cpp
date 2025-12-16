@@ -34,7 +34,7 @@ void SIPxApp::parse_raw_message(std::string&& raw_message) const {
     m_dispatcher.dispatch(evt);
 }
 
-void SIPxApp::on_event(const Event& evt) {
+void SIPxApp::on_event(Event& evt) {
     if (evt.type == EventType::MESSAGE_PARSED && evt.ownership_claimed == false) {
         m_msgs.push_back(std::unique_ptr<SIPMessage>(evt.parsed_msg));
         evt.ownership_claimed = true;

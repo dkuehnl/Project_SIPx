@@ -75,7 +75,7 @@ public:
     void write_log(const std::string_view msg);
     static std::string_view parse_error_code(ErrorCode code);
 
-    void on_event(const Event& evt) override;
+    void on_event(Event& evt) override;
 
 private:
     bool check_prepare_filepath(const std::string& input);

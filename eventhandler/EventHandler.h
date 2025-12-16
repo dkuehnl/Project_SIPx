@@ -50,7 +50,7 @@
 class EventHandler {
 public:
     virtual ~EventHandler() = default;
-    virtual void on_event(const Event& evt) = 0;
+    virtual void on_event(Event& evt) = 0;
 };
 
 #endif //PROJECT_SIPX_EVENTHANDLER_H

@@ -131,13 +131,13 @@ struct SocketEntry {
     uint16_t dest_port{0};
 };
 
-class SIPNetwork : public EventHandler {
+class SIPNetwork final : public EventHandler {
 public:
     explicit SIPNetwork(EventDispatcher* disp = nullptr, SIPLogWriter* log = nullptr);
     ~SIPNetwork() override;
 
 
-    void on_event(const Event& evt) override;
+    void on_event(Event& evt) override;
     void start();
     void stop();
 
