@@ -80,7 +80,6 @@ private:
     ErrorCode parse_request_line();
     std::string_view response_type;
     uint16_t response_code;
-
 };
 
 #endif //SIP_PARSER_SIPRESPONSE_H

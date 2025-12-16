@@ -3,6 +3,8 @@
 
 #include "app/SIPxApp.h"
 #include "parser/SIPParser.h"
+#include "eventhandler/SIPTimer.h"
+#include "eventhandler/EventDispatcher.h"
 
 constexpr std::string_view INVITE =
     "INVITE sip:bob@ims.telekom.de SIP/2.0\r\n"
@@ -78,24 +80,18 @@ int main() {
     flags.logwriter = true;
     flags.network = true;
 
+    EventDispatcher dispatcher;
+    SIPTimer timer(dispatcher);
+    SIPParser parser(&dispatcher);
+
+    Event evt;
+    evt.type = EventType::TIME_TO_REGISTER;
+
+    timer.schedule_after(std::chrono::milliseconds(1000), evt);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
     try {
-        const SIPxApp app(flags, "C:\\Users\\dkueh");
-        app.parse_raw_message(std::string(INVITE));
-        for (const auto& msg : app.get_messages()) {
-            std::cout << msg->from() << std::endl;
-        }
-        /*auto response_180 = SIPResponse(std::string(Response_180));
-        std::cout << "Response 180:" << std::endl;
-        std::cout
-        << "Has Content: " << response_180.is_content_attached() << std::endl
-        << "Content-Length: " << response_180.get_content_length() << std::endl
-        << "Content-Type: '" << response_180.get_content_type() << "'" << std::endl;
-       auto response_200 = SIPResponse(std::string(Response_200));
-        std::cout << "Response 200: " << std::endl;
-        std::cout
-        << "Has Content: " << response_200.is_content_attached() << std::endl
-        << "Content-Length: " << response_200.get_content_length() << std::endl
-        << "Content-Type: '" << response_200.get_content_type() << "'" << std::endl;*/
+
 
     } catch (const std::invalid_argument& e) {
         std::cerr << e.what() << std::endl;

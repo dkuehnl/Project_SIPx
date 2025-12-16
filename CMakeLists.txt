@@ -24,6 +24,11 @@ add_executable(Project_SIPx main.cpp
         network/platform/WindowsSocket.h
         network/SIPNetwork.cpp
         network/SIPNetwork.h
+        eventhandler/SIPTimer.cpp
+        eventhandler/SIPTimer.h
+        register/SIPRegister.cpp
+        register/SIPRegister.h
+        utils/sip_utils.h
 )
 
 if (WIN32)
