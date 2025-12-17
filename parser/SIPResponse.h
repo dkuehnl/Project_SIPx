@@ -66,9 +66,10 @@
 #include "SIPMessage.h"
 
 
-class SIPResponse : public SIPMessage {
+class SIPResponse final : public SIPMessage {
 public:
     explicit SIPResponse(std::string message, SIPLogWriter* logger = nullptr, EventDispatcher* dispatcher = nullptr);
+    MessageType type() const override {return MessageType::Response;}
 
     uint16_t get_response_code() const { return response_code; }
     std::string_view get_response_type() const { return response_type; }

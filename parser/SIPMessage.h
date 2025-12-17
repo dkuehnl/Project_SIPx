@@ -78,6 +78,11 @@ struct SIP_VIA_Header {
     std::string_view branch;
 };
 
+enum class MessageType {
+    Request,
+    Response
+};
+
 
 class SIPMessage : EventHandler {
 public:
@@ -87,6 +92,7 @@ public:
         EventDispatcher* dispatcher = nullptr
         );
     virtual ~SIPMessage() = default;
+    virtual MessageType type() const = 0;
 
     ErrorCode status() const { return m_parsing_status; }
     std::string_view request_line() const { return m_request_line; }

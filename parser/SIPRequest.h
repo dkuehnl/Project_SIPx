@@ -83,9 +83,10 @@ enum class SIPMethod {
     UNKNOWN
 };
 
-class SIPRequest : public SIPMessage {
+class SIPRequest final : public SIPMessage {
 public:
     explicit SIPRequest(std::string message, SIPLogWriter* logger = nullptr, EventDispatcher* dispatcher = nullptr);
+    MessageType type() const override { return MessageType::Request; }
 
     std::string_view method() const { return m_method; }
     std::string_view request_uri() const { return m_uri; }
