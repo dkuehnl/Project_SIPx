@@ -64,7 +64,7 @@ public:
     std::unique_ptr<SIPMessage> parse_message(std::string&& sip_message);
     [[nodiscard]] unsigned int get_paket_count() const { return m_paket_count; }
 
-    void on_event(const Event& evt) override;
+    void on_event(Event& evt) override;
 
 private:
     EventDispatcher* m_dispatcher = nullptr;
