@@ -26,12 +26,14 @@ struct CSeq {
 };
 
 struct Contact {
-    std::string uri{};
+    std::string scheme{};
+    std::string user{};
     std::string host{};
     std::string port{};
     std::string transport{};
-    std::string expire{};
-    std::vector<std::string> parameter{};
+    std::string uri_params{};
+    std::string expires{};
+    std::string params{};
 };
 
 struct Header {
@@ -54,6 +56,7 @@ struct SIPMessage {
     std::vector<std::string>    route{};
     std::vector<std::string>    record_route{};
     CSeq                        cseq{};
+    std::vector<Contact>        contacts{};
     std::string                 call_id{};
     std::string                 content_length{};
     std::string                 content_type{};

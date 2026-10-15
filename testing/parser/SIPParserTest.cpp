@@ -20,7 +20,7 @@ constexpr std::string_view INVITE_MSG =
     "p-preferred-identity: <sip:4911111111@192.168.178.1:5060>\r\n"
     "CSeq: 1 INVITE\r\n"
     "Allow: INVITE, ACK, OPTIONS, BYE, CANCEL, REGISTER, INFO, UPDATE, PRACK\r\n"
-    "Contact: <sip:alice@client.example.com:5060;transport=tcp>;expire=200\r\n"
+    "Contact: <sip:alice@client.example.com:5060;transport=tcp>;expires=200\r\n"
     "Content-Type: application/sdp\r\n"
     "Content-Length: 148\r\n"
     "\r\n"
@@ -181,5 +181,17 @@ constexpr std::string_view Response_200_MSG =
 
         EXPECT_THAT(message.require, ::testing::Contains("timer"));
     }
-}
 
+    TEST_F(SIPParserTest, ParseContact) {
+        const auto message = m_parser.parse_message(INVITE_MSG);
+
+        EXPECT_THAT(message.contacts[0].scheme, "sip");
+        EXPECT_THAT(message.contacts[0].user, "alice");
+        EXPECT_THAT(message.contacts[0].host, "client.example.com");
+        EXPECT_THAT(message.contacts[0].port, "5060");
+        EXPECT_THAT(message.contacts[0].transport, "tcp");
+        EXPECT_THAT(message.contacts[0].expires, "200");
+        EXPECT_THAT(message.contacts[0].params, "");
+        EXPECT_THAT(message.contacts[0].uri_params, "");
+    }
+}

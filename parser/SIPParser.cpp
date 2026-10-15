@@ -51,12 +51,26 @@
 #include "SIPParser.h"
 
 #include <iostream>
+#include <optional>
 
 #include "SIPRequest.h"
 #include "SIPResponse.h"
 #include "../utils/sip_utils.h"
 
 namespace {
+    struct UriParts {
+        std::string_view scheme{};
+        std::string_view user{};
+        std::string_view host{};
+        std::string_view port{};
+        std::string_view params{};
+    };
+
+    struct NameAddrParts {
+        std::string_view addr{};
+        std::string_view params{};
+    };
+
     constexpr std::string_view trim(std::string_view s) noexcept {
         while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
         while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
@@ -85,43 +99,71 @@ namespace {
         return std::string_view::npos;
     }
 
-    void parse_uri(std::string_view uri, NameAddr& out) {
+    std::optional<UriParts> split_uri(std::string_view uri) {
+        UriParts p;
+
         const auto colon = uri.find(':');
-        if (colon == std::string_view::npos) {
-            //TODO: Log-Message
-            return;
-        }
-        out.scheme = uri.substr(0, colon);
+        if (colon == std::string_view::npos) return std::nullopt;
+        p.scheme = uri.substr(0, colon);
         uri.remove_prefix(colon + 1);
 
         if (const auto semi = uri.find(';'); semi != std::string_view::npos) {
-            out.uri_param = uri.substr(semi + 1);
+            p.params = uri.substr(semi + 1);
             uri = uri.substr(0, semi);
         }
 
-        if (iequals(out.scheme, "tel")) {
-            out.user = uri;
-            return;
+        if (iequals(p.scheme, "tel")) {
+            p.user = uri;
+            return p;
         }
 
         if (const auto at = uri.find('@'); at != std::string_view::npos) {
-            out.user = uri.substr(0, at);
+            p.user = uri.substr(0, at);
             uri.remove_prefix(at + 1);
         }
 
+        std::size_t host_end = 0;
         if (!uri.empty() && uri.front() == '[') {
             const auto rb = uri.find(']');
-            if (rb == std::string_view::npos) {
-                //TODO: Logging
-                return;
-            }
-            out.host = uri.substr(0, rb + 1);
+            if (rb == std::string_view::npos) return std::nullopt;
+            host_end = rb + 1;
         } else {
-            out.host = uri.substr(0, uri.find(':'));
+            host_end = std::min(uri.find(':'), uri.size());
         }
+
+        p.host = uri.substr(0, host_end);
+        if (host_end < uri.size() && uri[host_end] == ':') {
+            p.port = uri.substr(host_end + 1);
+        }
+
+        return p;
     }
 
-    void parse_header_params(std::string_view params, NameAddr& out) {
+    std::optional<NameAddrParts> split_name_addr(std::string_view value) {
+        std::size_t search_from = 0;
+        if (!value.empty() && value.front() == '"') {
+            const auto closing = find_closing_quote(value);
+            if (closing == std::string_view::npos) return std::nullopt;
+            search_from = closing + 1;
+        }
+
+        if (const auto lt = value.find('<', search_from); lt != std::string_view::npos) {
+            const auto gt = value.find('>', lt + 1);
+            if (gt == std::string_view::npos) return std::nullopt;
+
+            return NameAddrParts{trim(value.substr(lt + 1, gt - lt - 1)), value.substr(gt + 1)};
+        }
+
+        const auto semi = value.find(';');
+        return NameAddrParts{trim(value.substr(0, semi)),
+            semi == std::string_view::npos
+            ? std::string_view{}
+            : value.substr(semi) };
+    }
+
+    std::string take_param(std::string_view params, std::string_view key, std::string& value) {
+        std::string rest;
+
         params = trim(params);
         if (!params.empty() && params.front() == ';') params.remove_prefix(1);
 
@@ -130,49 +172,66 @@ namespace {
             const auto param = trim(params.substr(0, semi));
             params.remove_prefix(semi == std::string_view::npos ? params.size() : semi + 1);
 
+            if (param.empty()) continue;
+
             const auto eq = param.find('=');
-            if (eq != std::string_view::npos && iequals(trim(param.substr(0, eq)), "tag")) {
-                out.tag = trim(param.substr(eq + 1));
+            if (eq != std::string_view::npos && iequals(trim(param.substr(0, eq)), key)) {
+                value = trim(param.substr(eq + 1));
                 continue;
             }
 
-            if (!out.params.empty()) out.params += ';';
-            out.params += params;
-        }
+            if (!rest.empty()) rest += ';';
+            rest += param;
+         }
+        return rest;
     }
 
-    void parse_name_addr(std::string_view value, NameAddr& out) {
-        std::size_t search_from = 0;
+    std::string_view next_list_item(std::string_view& rest) {
+        bool in_quotes{false};
+        bool in_angle{false};
 
-        if (!value.empty() && value.front() == '"') {
-            const auto closing = find_closing_quote(value);
-            if (closing == std::string_view::npos) {
-                //TODO: Logging
-                return;
+        for (std::size_t i = 0; i < rest.size(); ++i) {
+            const char c = rest[i];
+
+            if (in_quotes) {
+                if (c == '\\') ++i;
+                else if (c == '"') in_quotes = false;
+                continue;
             }
 
-            search_from = closing + 1;
-        }
-
-        std::string_view addr;
-        std::string_view params;
-
-        if (const auto lt = value.find('<', search_from); lt != std::string_view::npos) {
-            const auto gt = value.find('>', lt + 1);
-            if (gt == std::string_view::npos) {
-                //TODO: logging
-                return;
+            if (c == '"') in_quotes = true;
+            else if (c == '<') in_angle = true;
+            else if (c == '>') in_angle = false;
+            else if (c == ',' && !in_angle) {
+                const auto item = trim(rest.substr(0, i));
+                rest.remove_prefix(i + 1);
+                return item;
             }
-            addr = value.substr(lt + 1, gt - lt - 1);
-            params = value.substr(gt + 1);
-        } else {
-            const auto semi = value.find(';');
-            addr = value.substr(0, semi);
-            params = (semi == std::string_view::npos) ? std::string_view{} : value.substr(semi);
         }
 
-        parse_uri(trim(addr), out);
-        parse_header_params(params, out);
+        const auto item = trim(rest);
+        rest = {};
+        return item;
+    }
+
+    void parse_name_addr(std::string_view value, NameAddr& out, SIPMessage& msg) {
+        const auto na = split_name_addr(value);
+        if (!na) {
+            //TODO: Logging
+            return;
+        }
+
+        const auto uri = split_uri(na->addr);
+        if (!uri) {
+            //TODO: Logging
+            return;
+        }
+
+        out.scheme  = uri->scheme;
+        out.user    = uri->user;
+        out.host    = uri->host;
+        out.uri_param = uri->params;
+        out.params  = take_param(na->params, "tag", out.tag);
     }
 
     void parse_call_id(std::string_view value, SIPMessage& msg) {
@@ -196,11 +255,11 @@ namespace {
     }
 
     void parse_from(std::string_view value, SIPMessage& msg) {
-        parse_name_addr(value, msg.from);
+        parse_name_addr(value, msg.from, msg);
     }
 
     void parse_to(std::string_view value, SIPMessage& msg) {
-        parse_name_addr(value, msg.to);
+        parse_name_addr(value, msg.to, msg);
     }
 
     void parse_cseq(std::string_view value, SIPMessage& msg) {
@@ -232,6 +291,28 @@ namespace {
         parse_option_tags(value, msg.require);
     }
 
+    void parse_contact(std::string_view value, SIPMessage& msg) {
+        while (!value.empty()) {
+            const auto item = next_list_item(value);
+            if (item.empty()) continue;
+
+            const auto na = split_name_addr(item);
+            const auto uri = na ? split_uri(na->addr) : std::nullopt;
+            if (!uri) {
+                //TODO: Logging
+                return;
+            }
+
+            Contact& c  = msg.contacts.emplace_back();
+            c.scheme    = uri->scheme;
+            c.user      = uri->user;
+            c.host      = uri->host;
+            c.port      = uri->port;
+            c.uri_params = take_param(uri->params, "transport", c.transport);
+            c.params    = take_param(na->params, "expires", c.expires);
+        }
+    }
+
     using Handler = void (*)(std::string_view value, SIPMessage& msg);
 
     struct KnownHeader {
@@ -250,7 +331,8 @@ namespace {
         {"To", "t", parse_to},
         {"CSeq", "", parse_cseq},
         {"Supported", "k", parse_supported},
-        {"Require", "", parse_required}
+        {"Require", "", parse_required},
+        {"Contact", "m", parse_contact}
     };
 
     bool dispatch(std::string_view header_name, std::string_view value, SIPMessage& msg) {
