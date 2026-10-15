@@ -61,7 +61,7 @@
 class SIPParser : public EventHandler {
 public:
     explicit SIPParser(EventDispatcher* disp = nullptr, SIPLogWriter* logger = nullptr);
-    std::unique_ptr<SIPMessage> parse_message(std::string&& sip_message);
+    SIPMessage parse_message(std::string_view sip_message);
     [[nodiscard]] unsigned int get_paket_count() const { return m_paket_count; }
 
     void on_event(Event& evt) override;
@@ -72,6 +72,7 @@ private:
     unsigned int m_paket_count = 0;
 
     static bool is_response(std::string_view sip_message);
+    bool parse_rline(std::string_view sip_message, SIPMessage& msg);
 };
 
 

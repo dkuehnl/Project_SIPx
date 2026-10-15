@@ -55,18 +55,18 @@
  */
 
 
-#include "SIPMessage.h"
+#include "SIPMessage_old.h"
 
 #include <algorithm>
 #include <iostream>
 #include <utility>
 #include <chrono>
 
-const std::unordered_map<std::string_view, SIPMessage::HandlerFn>
-SIPMessage::handlers = {
-    { "Supported", &SIPMessage::handle_supported },
-    { "Require", &SIPMessage::handle_required },
-    { "Allow", &SIPMessage::handle_allow }
+const std::unordered_map<std::string_view, SIPMessage_old::HandlerFn>
+SIPMessage_old::handlers = {
+    { "Supported", &SIPMessage_old::handle_supported },
+    { "Require", &SIPMessage_old::handle_required },
+    { "Allow", &SIPMessage_old::handle_allow }
 };
 
 static std::string_view trim(std::string_view sv) {
@@ -77,7 +77,7 @@ static std::string_view trim(std::string_view sv) {
     return sv;
 }
 
-std::vector<std::string_view> SIPMessage::parse_values(const std::vector<std::string_view>& list) {
+std::vector<std::string_view> SIPMessage_old::parse_values(const std::vector<std::string_view>& list) {
     std::vector<std::string_view> final_values;
 
     for (std::string_view sv : list) {
@@ -106,7 +106,7 @@ std::vector<std::string_view> SIPMessage::parse_values(const std::vector<std::st
     return final_values;
 }
 
-SIPMessage::SIPMessage(std::string message, SIPLogWriter* logger, EventDispatcher* dispatcher)
+SIPMessage_old::SIPMessage_old(std::string message, SIPLogWriter* logger, EventDispatcher* dispatcher)
     : m_message(std::move(message)), m_logger(logger), m_dispatcher(dispatcher){
 
     if (m_message.empty()) {
@@ -117,7 +117,7 @@ SIPMessage::SIPMessage(std::string message, SIPLogWriter* logger, EventDispatche
         throw std::invalid_argument("[SIPMessage.cpp] Message does not end with \r\n");
     }
 
-    if (!SIPMessage::parse_message()) {
+    if (!SIPMessage_old::parse_message()) {
         return;
     }
     if (!parse_all()) {
@@ -125,7 +125,7 @@ SIPMessage::SIPMessage(std::string message, SIPLogWriter* logger, EventDispatche
     }
 }
 
-bool SIPMessage::is_value_ascii(const std::string_view value) {
+bool SIPMessage_old::is_value_ascii(const std::string_view value) {
     for (const unsigned char c : value) {
 
         if (c == '\r' || c == '\n') continue;
@@ -136,7 +136,7 @@ bool SIPMessage::is_value_ascii(const std::string_view value) {
     return true;
 }
 
-bool SIPMessage::is_header_ascii(const std::string_view header) {
+bool SIPMessage_old::is_header_ascii(const std::string_view header) {
     for (const unsigned char c : header) {
         if (c > 127) return false;
         if (!std::isalnum(c) && c != '-' && c != '_') return false;
@@ -144,7 +144,7 @@ bool SIPMessage::is_header_ascii(const std::string_view header) {
     return true;
 }
 
-void SIPMessage::log(std::string_view msg) const {
+void SIPMessage_old::log(std::string_view msg) const {
     if (m_dispatcher) {
         Event evt;
         evt.type = EventType::LOG_MESSAGE;
@@ -156,11 +156,11 @@ void SIPMessage::log(std::string_view msg) const {
     }
 }
 
-void SIPMessage::on_event(Event &evt) {
+void SIPMessage_old::on_event(Event &evt) {
 
 }
 
-bool SIPMessage::parse_message() {
+bool SIPMessage_old::parse_message() {
     const char* ptr = m_message.data();
     const char* end = ptr + m_message.size();
 
@@ -217,14 +217,14 @@ bool SIPMessage::parse_message() {
     return true;
 }
 
-bool SIPMessage::parse_all() {
+bool SIPMessage_old::parse_all() {
     static constexpr ParserFn steps[] = {
-        &SIPMessage::parse_from,
-        &SIPMessage::parse_to,
-        &SIPMessage::parse_cseq,
-        &SIPMessage::parse_via,
-        &SIPMessage::parse_contact,
-        &SIPMessage::parse_content
+        &SIPMessage_old::parse_from,
+        &SIPMessage_old::parse_to,
+        &SIPMessage_old::parse_cseq,
+        &SIPMessage_old::parse_via,
+        &SIPMessage_old::parse_contact,
+        &SIPMessage_old::parse_content
     };
 
     for (const auto fn : steps ) {
@@ -260,7 +260,7 @@ bool SIPMessage::parse_all() {
 
     return true;
 }
-const std::vector<std::string_view>& SIPMessage::get_header(const std::string_view header_value) const {
+const std::vector<std::string_view>& SIPMessage_old::get_header(const std::string_view header_value) const {
     static constexpr std::vector<std::string_view> empty;
     if (const auto element = m_headers.find(header_value); element != m_headers.end()) {
         return element->second;
@@ -268,7 +268,7 @@ const std::vector<std::string_view>& SIPMessage::get_header(const std::string_vi
     return empty;
 }
 
-ErrorCode SIPMessage::parse_via() {
+ErrorCode SIPMessage_old::parse_via() {
     const auto& vias = get_header("Via");
     if (vias.empty()) {
         log("[SIPMessage parse_via()]: Malformed SIP-Message, no VIA-Headers");
@@ -320,7 +320,7 @@ ErrorCode SIPMessage::parse_via() {
     return ErrorCode::OK;
 }
 
-ErrorCode SIPMessage::parse_contact() {
+ErrorCode SIPMessage_old::parse_contact() {
     const auto& contacts = get_header("Contact");
     if (contacts.size() > 1) {
         log("[SIPMessage::parse_contact()]: More than one Contact found.");
@@ -354,7 +354,7 @@ ErrorCode SIPMessage::parse_contact() {
 }
 
 
-ErrorCode SIPMessage::parse_cseq() {
+ErrorCode SIPMessage_old::parse_cseq() {
     const auto first_space = cseq_value.find(' ');
     const auto line_end = cseq_value.find('\r');
     if (first_space == std::string_view::npos || line_end == std::string_view::npos) {
@@ -368,7 +368,7 @@ ErrorCode SIPMessage::parse_cseq() {
     return ErrorCode::OK;
 }
 
-ErrorCode SIPMessage::parse_to() {
+ErrorCode SIPMessage_old::parse_to() {
     const auto first_sep = to_value.find("sip");
     if (first_sep == std::string_view::npos) {
         log("[SIPMessage::parse_to()]: Malformed URI header!");
@@ -400,7 +400,7 @@ ErrorCode SIPMessage::parse_to() {
     return ErrorCode::OK;
 }
 
-ErrorCode SIPMessage::parse_from() {
+ErrorCode SIPMessage_old::parse_from() {
     const auto first_sep = from_value.find("sip");
     if (first_sep == std::string_view::npos) {
         log("[SIPMessage::parse_from()]: Malformed URI header, no sip: found!");
@@ -434,7 +434,7 @@ ErrorCode SIPMessage::parse_from() {
     return ErrorCode::OK;
 }
 
-ErrorCode SIPMessage::parse_list_headers(const std::string& header_name) {
+ErrorCode SIPMessage_old::parse_list_headers(const std::string& header_name) {
     const auto& list = get_header(header_name);
     if (list.empty()) {
         log("[SIPMessage::parse_list_headers()]: No header with " + header_name + " found.");
@@ -455,7 +455,7 @@ ErrorCode SIPMessage::parse_list_headers(const std::string& header_name) {
     return ErrorCode::OK;
 }
 
-ErrorCode SIPMessage::parse_session_expire() {
+ErrorCode SIPMessage_old::parse_session_expire() {
     if (const auto& min_se_list = get_header("Min-SE"); min_se_list.empty() || min_se_list.size() > 2) {
         log("[SIPMessage parse_session_expire()]: No Min-SE-Header or invalid");
     } else {
@@ -509,7 +509,7 @@ ErrorCode SIPMessage::parse_session_expire() {
     return ErrorCode::OK;
 }
 
-ErrorCode SIPMessage::parse_content() {
+ErrorCode SIPMessage_old::parse_content() {
     const auto& list_content_length = get_header("Content-Length");
     if (list_content_length.size() != 1) {
         log("[SIPMessage::parse_content()]: Malformed SIP-Message, no valid Content-Length-Header");

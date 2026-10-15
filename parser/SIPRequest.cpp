@@ -74,7 +74,7 @@
 #include <vector>
 
 SIPRequest::SIPRequest(std::string message, SIPLogWriter* logger, EventDispatcher* dispatcher)
-    : SIPMessage(std::move(message), logger, dispatcher) {
+    : SIPMessage_old(std::move(message), logger, dispatcher) {
 
     if (m_parsing_status == ErrorCode::OK) {
         SIPRequest::parse_message();
@@ -137,7 +137,7 @@ bool SIPRequest::parse_message() {
 }
 
 ErrorCode SIPRequest::parse_request_line() {
-    auto request_line = SIPMessage::request_line();
+    auto request_line = SIPMessage_old::request_line();
     const auto first_space = request_line.find(' ');
     const auto second_space = request_line.find(' ', first_space + 1);
     const auto host_seperator = request_line.find('@', first_space + 1);

@@ -68,7 +68,7 @@
 #ifndef SIP_PARSER_SIPREQUEST_H
 #define SIP_PARSER_SIPREQUEST_H
 
-#include "SIPMessage.h"
+#include "SIPMessage_old.h"
 #include "../logwriter/SIPLogWriter.h"
 
 enum class SIPMethod {
@@ -83,7 +83,7 @@ enum class SIPMethod {
     UNKNOWN
 };
 
-class SIPRequest final : public SIPMessage {
+class SIPRequest final : public SIPMessage_old {
 public:
     explicit SIPRequest(std::string message, SIPLogWriter* logger = nullptr, EventDispatcher* dispatcher = nullptr);
     MessageType type() const override { return MessageType::Request; }

@@ -63,10 +63,10 @@
 #ifndef SIP_PARSER_SIPRESPONSE_H
 #define SIP_PARSER_SIPRESPONSE_H
 
-#include "SIPMessage.h"
+#include "SIPMessage_old.h"
 
 
-class SIPResponse final : public SIPMessage {
+class SIPResponse final : public SIPMessage_old {
 public:
     explicit SIPResponse(std::string message, SIPLogWriter* logger = nullptr, EventDispatcher* dispatcher = nullptr);
     MessageType type() const override {return MessageType::Response;}
