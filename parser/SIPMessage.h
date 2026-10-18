@@ -4,6 +4,11 @@
 #include <string>
 #include <vector>
 
+enum class MessageType : uint8_t {
+    UNKNOWN,
+    REQUEST,
+    RESPONSE
+};
 struct NameAddr {
     std::string scheme{};
     std::string user{};
@@ -15,9 +20,10 @@ struct NameAddr {
 
 struct Via {
     std::string transport{};
-    std::string host_ip{};
+    std::string host{};
     std::string port{};
     std::string branch{};
+    std::string params{};
 };
 
 struct CSeq {
@@ -39,10 +45,11 @@ struct Contact {
 struct Header {
     std::string name{};
     std::string value{};
+    bool operator==(const Header&) const = default;
 };
 
 struct SIPMessage {
-    bool is_request{false};
+    MessageType type{MessageType::UNKNOWN};
     bool is_complete{false};
 
     std::string method{};
@@ -65,6 +72,7 @@ struct SIPMessage {
     std::vector<std::string>    supported{};
     std::vector<std::string>    require{};
 
+    std::vector<Header>         unknown_header{};
     std::string                 body{};
 };
 

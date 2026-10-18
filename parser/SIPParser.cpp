@@ -53,8 +53,6 @@
 #include <iostream>
 #include <optional>
 
-#include "SIPRequest.h"
-#include "SIPResponse.h"
 #include "../utils/sip_utils.h"
 
 namespace {
@@ -69,6 +67,11 @@ namespace {
     struct NameAddrParts {
         std::string_view addr{};
         std::string_view params{};
+    };
+
+    struct HostPort {
+        std::string_view host{};
+        std::string_view port{};
     };
 
     constexpr std::string_view trim(std::string_view s) noexcept {
@@ -233,6 +236,21 @@ namespace {
         out.uri_param = uri->params;
         out.params  = take_param(na->params, "tag", out.tag);
     }
+    std::optional<HostPort> split_hostport(std::string_view value) {
+        std::size_t host_end = 0;
+        if (!value.empty() && value.front() == '[') {
+            const auto rb = value.find(']');
+            if (rb == std::string_view::npos) return std::nullopt;
+            host_end = rb + 1;
+        } else {
+            host_end = std::min(value.find(':'), value.size());
+        }
+
+        HostPort hp{value.substr(0, host_end), {}};
+        if (host_end < value.size() && value[host_end] == ':') hp.port = value.substr(host_end + 1);
+
+        return hp;
+    }
 
     void parse_call_id(std::string_view value, SIPMessage& msg) {
         msg.call_id = std::string{value};
@@ -300,7 +318,7 @@ namespace {
             const auto uri = na ? split_uri(na->addr) : std::nullopt;
             if (!uri) {
                 //TODO: Logging
-                return;
+                continue;
             }
 
             Contact& c  = msg.contacts.emplace_back();
@@ -311,6 +329,53 @@ namespace {
             c.uri_params = take_param(uri->params, "transport", c.transport);
             c.params    = take_param(na->params, "expires", c.expires);
         }
+    }
+
+    void parse_via(std::string_view value, SIPMessage& msg) {
+        while (!value.empty()) {
+            const auto item = next_list_item(value);
+            if (item.empty()) continue;
+
+            const auto first_ws = item.find(' ');
+            if (first_ws == std::string_view::npos) {
+                //TODO: Logging
+                continue;
+            }
+
+            const auto rest = trim(item.substr(first_ws + 1));
+            const auto sep = rest.find(';');
+
+            const auto hp = split_hostport(trim(rest.substr(0, sep)));
+            if (!hp) {
+                //TODO: Logging
+                continue;
+            }
+
+            auto& [transport, host, port, branch, params] = msg.via.emplace_back();
+            transport = item.substr(0, first_ws);
+            host      = hp->host;
+            port      = hp->port;
+
+            if (sep != std::string_view::npos) {
+                params = take_param(rest.substr(sep), "branch", branch);
+            }
+        }
+
+    }
+
+    void parse_route_list(std::string_view value, std::vector<std::string>& out) {
+        while (!value.empty()) {
+            const auto item = next_list_item(value);
+            if (!item.empty()) out.emplace_back(item);
+        }
+    }
+
+    void parse_route(std::string_view value, SIPMessage& msg) {
+        parse_route_list(value, msg.route);
+    }
+
+    void parse_record_route(std::string_view value, SIPMessage& msg) {
+        parse_route_list(value, msg.record_route);
     }
 
     using Handler = void (*)(std::string_view value, SIPMessage& msg);
@@ -332,7 +397,10 @@ namespace {
         {"CSeq", "", parse_cseq},
         {"Supported", "k", parse_supported},
         {"Require", "", parse_required},
-        {"Contact", "m", parse_contact}
+        {"Contact", "m", parse_contact},
+        {"Via", "v", parse_via},
+        {"Route", "", parse_route},
+        {"Record-Route", "", parse_record_route}
     };
 
     bool dispatch(std::string_view header_name, std::string_view value, SIPMessage& msg) {
@@ -344,6 +412,26 @@ namespace {
         }
 
         return false;
+    }
+
+    void parse_rline(std::string_view sip_message, SIPMessage& msg) {
+        const auto request_line_end = sip_message.find("\r\n");
+        const auto start_line = sip_message.substr(0, request_line_end);
+        const auto sp1 = start_line.find(' ');
+
+        if (start_line.starts_with("SIP/2.0 ")) {
+            msg.type = MessageType::RESPONSE;
+            const auto sp2 = start_line.find(' ', sp1 + 1);
+            msg.status_code = start_line.substr(sp1 + 1, sp2 - sp1 - 1);
+            msg.reason = (sp2 == std::string_view::npos) ? std::string_view{} : start_line.substr(sp2 + 1);
+        }
+
+        if (start_line.ends_with(" SIP/2.0")) {
+            msg.type = MessageType::REQUEST;
+            const auto sp2 = start_line.rfind(' ');
+            msg.method = start_line.substr(0, sp1);
+            msg.request_uri = start_line.substr(sp1 + 1, sp2 - sp1 - 1);
+        }
     }
 
 }
@@ -370,44 +458,18 @@ void SIPParser::on_event(Event& evt) {
     }
 }
 
-bool SIPParser::parse_rline(std::string_view sip_message, SIPMessage& msg) {
-    const auto request_line_end = sip_message.find("\r\n");
-    const auto start_line = sip_message.substr(0, request_line_end);
-    const auto sp1 = start_line.find(' ');
-
-    if (start_line.starts_with("SIP/2.0 ")) {
-        msg.is_request = false;
-        const auto sp2 = start_line.find(' ', sp1 + 1);
-        msg.status_code = start_line.substr(sp1 + 1, sp2 - sp1 - 1);
-        msg.reason = (sp2 == std::string_view::npos) ? std::string_view{} : start_line.substr(sp2 + 1);
-
-        return true;
-    }
-
-    if (start_line.ends_with(" SIP/2.0")) {
-        msg.is_request = true;
-        const auto sp2 = start_line.rfind(' ');
-        msg.method = start_line.substr(0, sp1);
-        msg.request_uri = start_line.substr(sp1 + 1, sp2 - sp1 - 1);
-
-        return true;
-    }
-
-    return false;
-}
-
-
 SIPMessage SIPParser::parse_message(std::string_view sip_message) {
     SIPMessage message{};
 
     const auto message_end = sip_message.find("\r\n\r\n");
     const auto request_line_end = sip_message.find("\r\n");
     message.is_complete = message_end != std::string_view::npos && request_line_end > 0;
-
-    if (!parse_rline(sip_message, message)) {
-
+    if (!message.is_complete) {
+        //TODO: Logging
+        return message;
     }
 
+    parse_rline(sip_message, message);
     std::string_view sip_headers = sip_message.substr(request_line_end + 2, message_end - request_line_end - 2);
 
     while (!sip_headers.empty()) {
@@ -422,9 +484,11 @@ SIPMessage SIPParser::parse_message(std::string_view sip_message) {
         const auto plain_value = trim(line.substr(colon + 1));
 
         if (!dispatch(header_name, plain_value, message)) {
-
+            message.unknown_header.push_back({std::string{header_name}, std::string{plain_value}});
         }
     }
+
+    message.body = sip_message.substr(message_end + 4);
 
     return message;
 }

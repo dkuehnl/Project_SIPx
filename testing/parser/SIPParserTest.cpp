@@ -49,7 +49,11 @@ constexpr std::string_view brocken_INVITE_MSG =
 constexpr std::string_view Response_183_MSG =
     "SIP/2.0 183 Session Progress\r\n"
     "Via: SIP/2.0/TCP 217.0.149.80:5060;branch=z9hG4bKmodidajkli218u1mkd\r\n"
+    "Via: SIP/2.0/TCP 217.0.150.80:5060;branch=z9hG4bKmodidajkli218u2mkd\r\n"
+    "Via: SIP/2.0/TCP 217.0.161.80:5060;branch=z9hG4bKmodidajkli218u3mkd\r\n"
     "Record-Route: <sip:mavodi-0-266-jdfklj-dsie-ffffff-ffsaljfi>\r\n"
+    "Record-Route: <sip:mavodi-0-270-jdfklj-dsie-ffffff-ffsaljfi>\r\n"
+    "Route: <sip:p1.example.com;lr>, <sip:p2.example.com:5060;lr;transport=tcp>\r\n"
     "From: <sip:+4978945135753@tel.t-online.de;user=phone>;tag=4567324867dafds8725\r\n"
     "To: <sip:+48975642357@tel.t-online.de;user=phone>;tag=241584735874\r\n"
     "Call-ID: 1234567890@adce\r\n"
@@ -101,6 +105,12 @@ constexpr std::string_view Response_200_MSG =
         EXPECT_TRUE(message.is_complete);
     }
 
+    TEST_F(SIPParserTest, NoExceptionWithEmptyInput) {
+        const auto message = m_parser.parse_message("");
+
+        EXPECT_FALSE(message.is_complete);
+    }
+
     TEST_F(SIPParserTest, DetectIncompleteMessage) {
         const auto message = m_parser.parse_message(brocken_INVITE_MSG);
 
@@ -110,13 +120,13 @@ constexpr std::string_view Response_200_MSG =
     TEST_F(SIPParserTest, DetectMessageAsRequest) {
         const auto message = m_parser.parse_message(INVITE_MSG);
 
-        EXPECT_TRUE(message.is_request);
+        EXPECT_THAT(message.type, MessageType::REQUEST);
     }
 
     TEST_F(SIPParserTest, DetectMessageAsResponse) {
         const auto message = m_parser.parse_message(Response_183_MSG);
 
-        EXPECT_FALSE(message.is_request);
+        EXPECT_THAT(message.type, MessageType::RESPONSE);
     }
 
     TEST_F(SIPParserTest, ParseRequestLineRequest) {
@@ -193,5 +203,74 @@ constexpr std::string_view Response_200_MSG =
         EXPECT_THAT(message.contacts[0].expires, "200");
         EXPECT_THAT(message.contacts[0].params, "");
         EXPECT_THAT(message.contacts[0].uri_params, "");
+    }
+
+    TEST_F(SIPParserTest, ParseOneViaHeader) {
+        const auto message = m_parser.parse_message(INVITE_MSG);
+
+        EXPECT_THAT(message.via[0].transport, "SIP/2.0/UDP");
+        EXPECT_THAT(message.via[0].host, "client.example.com");
+        EXPECT_THAT(message.via[0].port, "5060");
+        EXPECT_THAT(message.via[0].branch, "z9hG4bK-12345");
+    }
+
+    TEST_F(SIPParserTest, ParseMoreViaHeader) {
+        const auto message = m_parser.parse_message(Response_183_MSG);
+
+        EXPECT_THAT(message.via, ::testing::ElementsAre(
+            ::testing::Field(&Via::branch, "z9hG4bKmodidajkli218u1mkd"),
+            ::testing::Field(&Via::branch, "z9hG4bKmodidajkli218u2mkd"),
+            ::testing::Field(&Via::branch, "z9hG4bKmodidajkli218u3mkd"))
+            );
+    }
+
+    TEST_F(SIPParserTest, ParseOneRecordRoute) {
+        const auto message = m_parser.parse_message(Response_183_MSG);
+
+        EXPECT_THAT(message.record_route[0], "<sip:mavodi-0-266-jdfklj-dsie-ffffff-ffsaljfi>");
+    }
+
+    TEST_F(SIPParserTest, ParseMoreRecordRoute) {
+        const auto message = m_parser.parse_message(Response_183_MSG);
+
+        EXPECT_THAT(message.record_route, ::testing::ElementsAre(
+            "<sip:mavodi-0-266-jdfklj-dsie-ffffff-ffsaljfi>",
+            "<sip:mavodi-0-270-jdfklj-dsie-ffffff-ffsaljfi>")
+            );
+    }
+
+    TEST_F(SIPParserTest, ParseOneRouteHeader) {
+        const auto message = m_parser.parse_message(Response_183_MSG);
+
+        EXPECT_THAT(message.route[0], "<sip:p1.example.com;lr>");
+    }
+
+    TEST_F(SIPParserTest, ParseMoreRouteHeader) {
+        const auto message = m_parser.parse_message(Response_183_MSG);
+
+        EXPECT_THAT(message.route, ::testing::ElementsAre(
+            "<sip:p1.example.com;lr>",
+            "<sip:p2.example.com:5060;lr;transport=tcp>")
+            );
+    }
+
+    TEST_F(SIPParserTest, ParseUnknownHeader) {
+        const auto message = m_parser.parse_message(Response_200_MSG);
+
+        EXPECT_THAT(message.unknown_header, ::testing::Contains(Header{"Session-Expires", "1800"}));
+    }
+
+    TEST_F(SIPParserTest, ExtractSIPBody) {
+        const auto message = m_parser.parse_message(INVITE_MSG);
+
+        EXPECT_THAT(message.body,
+            "v=0\r\n"
+            "o=alice 53655765 2353687637 IN IP4 client.example.com\r\n"
+            "s=-\r\n"
+            "c=IN IP4 client.example.com\r\n"
+            "t=0 0\r\n"
+            "m=audio 49170 RTP/AVP 0\r\n"
+            "a=rtpmap:0 PCMU/8000\r\n"
+        );
     }
 }

@@ -71,8 +71,6 @@ private:
     SIPLogWriter* m_logger = nullptr;
     unsigned int m_paket_count = 0;
 
-    static bool is_response(std::string_view sip_message);
-    bool parse_rline(std::string_view sip_message, SIPMessage& msg);
 };
 
 
