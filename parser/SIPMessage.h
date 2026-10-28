@@ -16,6 +16,8 @@ struct NameAddr {
     std::string uri_param{};
     std::string tag{};
     std::string params{};
+
+    bool operator==(const NameAddr&) const = default;
 };
 
 struct Via {
@@ -29,6 +31,8 @@ struct Via {
 struct CSeq {
     std::string number{};
     std::string method{};
+
+    bool operator==(const CSeq&) const = default;
 };
 
 struct Contact {
@@ -68,11 +72,13 @@ struct SIPMessage {
     std::string                 content_length{};
     std::string                 content_type{};
     std::string                 max_forwards{};
-    std::string                 allow{};
+    std::vector<std::string>    allow{};
     std::vector<std::string>    supported{};
     std::vector<std::string>    require{};
 
     std::vector<Header>         unknown_header{};
+    std::vector<Header>         malformed_header{};
+    std::vector<Header>         duplicate_header{};
     std::string                 body{};
 };
 

@@ -94,6 +94,29 @@ constexpr std::string_view Response_200_MSG =
     "m=audio 49170 RTP/AVP 0\r\n"
     "a=rtpmap:0 PCMU/8000\r\n";
 
+constexpr std::string_view Malformed_INVITE_MSG =
+    "INVITE sip:bob@b.example.com SIP/2.0\r\n"
+    "Via: SIP/2.0/UDP pc1.a.example.com:5060;branch=z9hG4bK1, SIP/2.0/UDP\r\n"   // F8: 1 gültig, 1 malformed
+    "Via: SIP/2.0/TCP [2001:db8::1;branch=z9hG4bK2\r\n"                          // F2 (List): malformed
+    "v: SIP/2.0/UDP proxy.example.com;branch=z9hG4bK3\r\n"                       // List compact: gültig
+    "From: \"Alice <sip:alice@a.example.com>;tag=1\r\n"                          // F2: malformed
+    "To: <sip:bob@b.example.com>\r\n"                                            // F1 / F4 erster sauber
+    "t: <sip:carol@c.example.com\r\n"                                            // F4: duplicate (kaputt, ungeparst)
+    "Call-ID: abc@a.example.com\r\n"                                             // F1 / F3 erster
+    "i: def@a.example.com\r\n"                                                   // F3: duplicate (compact)
+    "Call-ID: ghi@a.example.com\r\n"                                             // F3: duplicate
+    "CSeq: 1\r\n"                                                                // F5: malformed, belegt Slot
+    "CSeq: 2 INVITE\r\n"                                                         // F5: duplicate
+    "Contact: <sip:alice@pc1.a.example.com>;expires=3600, <alice-no-scheme>\r\n" // F8: 1 gültig, 1 malformed
+    "m: <sip:alice@pc2.a.example.com:5070;transport=tcp>\r\n"                    // List compact: gültig
+    "Allow: INVITE, ACK\r\n"                                                     // Allow mehrzeilig
+    "Allow: BYE, CANCEL\r\n"
+    "P-Asserted-Identity: <sip:alice@a.example.com>\r\n"                         // Unknown mehrfach
+    "P-Asserted-Identity: <tel:+4930123>\r\n"
+    "Content-Type:\r\n"                                                          // F7: leer
+    "Content-Length: 0\r\n"                                                      // F6: Max-Forwards fehlt
+    "\r\n";
+
     class SIPParserTest : public ::testing::Test {
         protected:
             SIPParser m_parser;
@@ -150,7 +173,6 @@ constexpr std::string_view Response_200_MSG =
         EXPECT_EQ(message.content_length, "148");
         EXPECT_EQ(message.content_type, "application/sdp");
         EXPECT_EQ(message.max_forwards, "70");
-        EXPECT_EQ(message.allow, "INVITE, ACK, OPTIONS, BYE, CANCEL, REGISTER, INFO, UPDATE, PRACK");
     }
 
     TEST_F(SIPParserTest, ParseFromHeader) {
@@ -190,6 +212,22 @@ constexpr std::string_view Response_200_MSG =
         const auto message = m_parser.parse_message(Response_200_MSG);
 
         EXPECT_THAT(message.require, ::testing::Contains("timer"));
+    }
+
+    TEST_F(SIPParserTest, ParseAllowHeader) {
+        const auto message = m_parser.parse_message(Response_200_MSG);
+
+        EXPECT_THAT(message.allow, ::testing::ElementsAre(
+            "INVITE",
+            "ACK",
+            "OPTIONS",
+            "BYE",
+            "CANCEL",
+            "REGISTER",
+            "INFO",
+            "UPDATE",
+            "PRACK"
+        ));
     }
 
     TEST_F(SIPParserTest, ParseContact) {
@@ -272,5 +310,46 @@ constexpr std::string_view Response_200_MSG =
             "m=audio 49170 RTP/AVP 0\r\n"
             "a=rtpmap:0 PCMU/8000\r\n"
         );
+    }
+
+    TEST_F(SIPParserTest, ParseDuplicateHeader) {
+        const auto message = m_parser.parse_message(Malformed_INVITE_MSG);
+
+        EXPECT_THAT(message.duplicate_header, ::testing::ElementsAre(
+            Header{"t","<sip:carol@c.example.com"},
+            Header{"i","def@a.example.com"},
+            Header{"Call-ID","ghi@a.example.com"},
+            Header{"CSeq","2 INVITE"}
+        ));
+    }
+
+    TEST_F(SIPParserTest, ParseMalformedHeader) {
+        const auto message = m_parser.parse_message(Malformed_INVITE_MSG);
+
+        EXPECT_THAT(message.malformed_header, ::testing::ElementsAre(
+            Header{"Via","SIP/2.0/UDP"},
+            Header{"Via","SIP/2.0/TCP [2001:db8::1;branch=z9hG4bK2"},
+            Header{"From","\"Alice <sip:alice@a.example.com>;tag=1"},
+            Header{"CSeq","1"},
+            Header{"Contact","<alice-no-scheme>"}
+        ));
+    }
+
+    TEST_F(SIPParserTest, ParseDuplicateUnknownHeader) {
+        const auto message = m_parser.parse_message(Malformed_INVITE_MSG);
+
+        EXPECT_THAT(message.unknown_header, ::testing::ElementsAre(
+            Header{"P-Asserted-Identity","<sip:alice@a.example.com>"},
+            Header{"P-Asserted-Identity","<tel:+4930123>"}
+        ));
+    }
+
+    TEST_F(SIPParserTest, ParseEmptyRequiredHeader) {
+        const auto message = m_parser.parse_message(Malformed_INVITE_MSG);
+
+        EXPECT_EQ(message.from, NameAddr{});
+        EXPECT_EQ(message.cseq, CSeq{});
+        EXPECT_TRUE(message.content_type.empty());
+        EXPECT_TRUE(message.max_forwards.empty());
     }
 }

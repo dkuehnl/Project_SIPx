@@ -52,6 +52,7 @@
 
 #include <iostream>
 #include <optional>
+#include <bitset>
 
 #include "../utils/sip_utils.h"
 
@@ -217,17 +218,21 @@ namespace {
         return item;
     }
 
-    void parse_name_addr(std::string_view value, NameAddr& out, SIPMessage& msg) {
+    void add_malformed(SIPMessage& msg, std::string_view name, std::string_view value) {
+        msg.malformed_header.push_back({std::string{name}, std::string{value}});
+    }
+
+    bool parse_name_addr(std::string_view value, NameAddr& out) {
         const auto na = split_name_addr(value);
         if (!na) {
             //TODO: Logging
-            return;
+            return false;
         }
 
         const auto uri = split_uri(na->addr);
         if (!uri) {
             //TODO: Logging
-            return;
+            return false;
         }
 
         out.scheme  = uri->scheme;
@@ -235,7 +240,10 @@ namespace {
         out.host    = uri->host;
         out.uri_param = uri->params;
         out.params  = take_param(na->params, "tag", out.tag);
+
+        return true;
     }
+
     std::optional<HostPort> split_hostport(std::string_view value) {
         std::size_t host_end = 0;
         if (!value.empty() && value.front() == '[') {
@@ -252,45 +260,6 @@ namespace {
         return hp;
     }
 
-    void parse_call_id(std::string_view value, SIPMessage& msg) {
-        msg.call_id = std::string{value};
-    }
-
-    void parse_content_length(std::string_view value, SIPMessage& msg) {
-        msg.content_length = std::string{value};
-    }
-
-    void parse_content_type(std::string_view value, SIPMessage& msg) {
-        msg.content_type = std::string{value};
-    }
-
-    void parse_max_forward(std::string_view value, SIPMessage& msg) {
-        msg.max_forwards = std::string{value};
-    }
-
-    void parse_allow(std::string_view value, SIPMessage& msg) {
-        msg.allow = std::string{value};
-    }
-
-    void parse_from(std::string_view value, SIPMessage& msg) {
-        parse_name_addr(value, msg.from, msg);
-    }
-
-    void parse_to(std::string_view value, SIPMessage& msg) {
-        parse_name_addr(value, msg.to, msg);
-    }
-
-    void parse_cseq(std::string_view value, SIPMessage& msg) {
-        const auto sep = value.find(' ');
-        if (sep == std::string_view::npos) {
-            //TODO Logging
-            return;
-        }
-
-        msg.cseq.number = trim(value.substr(0, sep));
-        msg.cseq.method = trim(value.substr(sep + 1));
-    }
-
     void parse_option_tags(std::string_view value, std::vector<std::string>& out) {
         while (!value.empty()) {
             const auto comma = value.find(',');
@@ -301,15 +270,55 @@ namespace {
         }
     }
 
-    void parse_supported(std::string_view value, SIPMessage& msg) {
+    void parse_call_id(std::string_view, std::string_view value, SIPMessage& msg) {
+        msg.call_id = std::string{value};
+    }
+
+    void parse_content_length(std::string_view, std::string_view value, SIPMessage& msg) {
+        msg.content_length = std::string{value};
+    }
+
+    void parse_content_type(std::string_view, std::string_view value, SIPMessage& msg) {
+        msg.content_type = std::string{value};
+    }
+
+    void parse_max_forward(std::string_view, std::string_view value, SIPMessage& msg) {
+        msg.max_forwards = std::string{value};
+    }
+
+    void parse_allow(std::string_view, std::string_view value, SIPMessage& msg) {
+        parse_option_tags(value, msg.allow);
+    }
+
+    void parse_from(std::string_view name, std::string_view value, SIPMessage& msg) {
+        if (!parse_name_addr(value, msg.from)) add_malformed(msg, name, value);
+    }
+
+    void parse_to(std::string_view name, std::string_view value, SIPMessage& msg) {
+        if (!parse_name_addr(value, msg.to)) add_malformed(msg, name, value);
+    }
+
+    void parse_cseq(std::string_view name, std::string_view value, SIPMessage& msg) {
+        const auto sep = value.find(' ');
+        if (sep == std::string_view::npos) {
+            add_malformed(msg, name, value);
+            //TODO Logging
+            return;
+        }
+
+        msg.cseq.number = trim(value.substr(0, sep));
+        msg.cseq.method = trim(value.substr(sep + 1));
+    }
+
+    void parse_supported(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_option_tags(value, msg.supported);
     }
 
-    void parse_required(std::string_view value, SIPMessage& msg) {
+    void parse_required(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_option_tags(value, msg.require);
     }
 
-    void parse_contact(std::string_view value, SIPMessage& msg) {
+    void parse_contact(std::string_view name, std::string_view value, SIPMessage& msg) {
         while (!value.empty()) {
             const auto item = next_list_item(value);
             if (item.empty()) continue;
@@ -317,6 +326,7 @@ namespace {
             const auto na = split_name_addr(item);
             const auto uri = na ? split_uri(na->addr) : std::nullopt;
             if (!uri) {
+                add_malformed(msg, name, item);
                 //TODO: Logging
                 continue;
             }
@@ -331,13 +341,14 @@ namespace {
         }
     }
 
-    void parse_via(std::string_view value, SIPMessage& msg) {
+    void parse_via(std::string_view name, std::string_view value, SIPMessage& msg) {
         while (!value.empty()) {
             const auto item = next_list_item(value);
             if (item.empty()) continue;
 
             const auto first_ws = item.find(' ');
             if (first_ws == std::string_view::npos) {
+                add_malformed(msg, name, item);
                 //TODO: Logging
                 continue;
             }
@@ -347,6 +358,7 @@ namespace {
 
             const auto hp = split_hostport(trim(rest.substr(0, sep)));
             if (!hp) {
+                add_malformed(msg, name, item);
                 //TODO: Logging
                 continue;
             }
@@ -370,48 +382,55 @@ namespace {
         }
     }
 
-    void parse_route(std::string_view value, SIPMessage& msg) {
+    void parse_route(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_route_list(value, msg.route);
     }
 
-    void parse_record_route(std::string_view value, SIPMessage& msg) {
+    void parse_record_route(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_route_list(value, msg.record_route);
     }
 
-    using Handler = void (*)(std::string_view value, SIPMessage& msg);
+    using Handler = void (*)(std::string_view name, std::string_view value, SIPMessage& msg);
 
     struct KnownHeader {
         std::string_view name;
         std::string_view compact;
         Handler handler;
+        bool multi;
     };
 
     constexpr KnownHeader kKnownHeaders[] = {
-        {"Call-ID", "i", parse_call_id},
-        {"Content-Length", "l", parse_content_length},
-        {"Content-Type", "c", parse_content_type},
-        {"Max-Forwards", "", parse_max_forward},
-        {"Allow", "", parse_allow},
-        {"From", "f", parse_from},
-        {"To", "t", parse_to},
-        {"CSeq", "", parse_cseq},
-        {"Supported", "k", parse_supported},
-        {"Require", "", parse_required},
-        {"Contact", "m", parse_contact},
-        {"Via", "v", parse_via},
-        {"Route", "", parse_route},
-        {"Record-Route", "", parse_record_route}
+        {"Call-ID",         "i", parse_call_id,         false},
+        {"Content-Length",  "l", parse_content_length,  false},
+        {"Content-Type",    "c", parse_content_type,    false},
+        {"Max-Forwards",    "", parse_max_forward,      false},
+        {"Allow",           "", parse_allow,            true},
+        {"From",        "f", parse_from,                false},
+        {"To",          "t", parse_to,                  false},
+        {"CSeq",            "", parse_cseq,             false},
+        {"Supported",       "k", parse_supported,       true},
+        {"Require",         "", parse_required,         true},
+        {"Contact",     "m", parse_contact,             true},
+        {"Via",         "v", parse_via,                 true},
+        {"Route",           "", parse_route,            true},
+        {"Record-Route",    "", parse_record_route,     true}
     };
 
-    bool dispatch(std::string_view header_name, std::string_view value, SIPMessage& msg) {
-        for (const auto& known : kKnownHeaders) {
-            if (iequals(header_name, known.name) || (!known.compact.empty() && iequals(header_name, known.compact))) {
-                known.handler(value, msg);
-                return true;
-            }
+    using SeenSet = std::bitset<std::size(kKnownHeaders)>;
+    enum class DispatchResult : uint8_t { Known, Duplicate, Unknown };
+
+    DispatchResult dispatch(std::string_view header_name, std::string_view value, SIPMessage& msg, SeenSet& seen) {
+        for (std::size_t i = 0; i < std::size(kKnownHeaders); ++i) {
+            const auto& k = kKnownHeaders[i];
+            if (!iequals(header_name, k.name) && (k.compact.empty() || !iequals(header_name, k.compact))) continue;
+
+            if (!k.multi && seen.test(i)) return DispatchResult::Duplicate;
+            seen.set(i);
+            k.handler(header_name, value, msg);
+            return DispatchResult::Known;
         }
 
-        return false;
+        return DispatchResult::Unknown;
     }
 
     void parse_rline(std::string_view sip_message, SIPMessage& msg) {
@@ -472,6 +491,8 @@ SIPMessage SIPParser::parse_message(std::string_view sip_message) {
     parse_rline(sip_message, message);
     std::string_view sip_headers = sip_message.substr(request_line_end + 2, message_end - request_line_end - 2);
 
+    SeenSet seen{};
+
     while (!sip_headers.empty()) {
         const auto eol = sip_headers.find("\r\n");
         const auto line = sip_headers.substr(0, eol);
@@ -483,8 +504,15 @@ SIPMessage SIPParser::parse_message(std::string_view sip_message) {
         const auto header_name = trim(line.substr(0, colon));
         const auto plain_value = trim(line.substr(colon + 1));
 
-        if (!dispatch(header_name, plain_value, message)) {
-            message.unknown_header.push_back({std::string{header_name}, std::string{plain_value}});
+        switch (dispatch(header_name, plain_value, message, seen)) {
+            case DispatchResult::Known:
+                break;
+            case DispatchResult::Duplicate:
+                message.duplicate_header.push_back({std::string{header_name}, std::string{plain_value}});
+                break;
+            case DispatchResult::Unknown:
+                message.unknown_header.push_back({std::string{header_name}, std::string{plain_value}});
+                break;
         }
     }
 
