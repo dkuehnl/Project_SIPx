@@ -117,6 +117,12 @@ constexpr std::string_view Malformed_INVITE_MSG =
     "Content-Length: 0\r\n"                                                      // F6: Max-Forwards fehlt
     "\r\n";
 
+constexpr std::string_view Malformed_Request_line_MSG =
+    "INVITE sip:x SIP/2.0\r\n\r\n"
+    "Via: SIP/2.0/UDP pc1.a.example.com:5060;branch=z9hG4bK1, SIP/2.0/UDP\r\n"   // F8: 1 gültig, 1 malformed
+    "Via: SIP/2.0/TCP [2001:db8::1;branch=z9hG4bK2\r\n"                          // F2 (List): malformed
+    "v: SIP/2.0/UDP proxy.example.com;branch=z9hG4bK3\r\n";
+
     class SIPParserTest : public ::testing::Test {
         protected:
             SIPParser m_parser;

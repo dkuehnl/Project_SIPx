@@ -1,60 +1,14 @@
-/*
- *  Project SIPx
- *  -------------
- *  SIPx is a flexible and extensible SIP engine designed primarily for
- *  troubleshooting, edge-case testing, and IMS-related scenarios. Its main goal
- *  is to give developers and DevOps engineers the ability to inspect,
- *  manipulate, and stress-test SIP/SDP/RTP flows in detail, including realistic
- *  failure and corner-case simulations.
- *
- *  Description of SIPParser:
- *  --------------------------
- *  The SIPParser is a wrapper-class for usage with e.g. the SIPxApp of this project.
- *  It provides an interface where you can put a SIP-Message into and get the correct
- *  message-type-object (SIPResponse or SIPRequest) back.
- *  The logging-function is optional and log-messages where only generated if a pointer to
- *  an SIPLogWriter-object is given on instantiation of the SIPParser.
- *
- *  Main responsibilities:
- *    • Deciding if the message is a SIP-response or -request
- *    • Instantiate based on that decision the correct SIPResponse or SIPRequest object
- *    • Automatically activate logging if a SIPLogWriter is provided
- *    • Count parsed packets with this instance
- *
- *  Internal structure:
- *    • Only SIPLogWriter-pointer and a counter is hold in this object
- *    • Parsed messages are given back to the caller and are not hold here
- *
- *  Purpose and usage:
- *    The only purpose is to give a common interface for parsing the messages so that
- *    the caller doesn't have to think about what message-type to instantiate.
- *
- *  Author:  Dennis Kühnlein
- *  Version: v0.1
- *  Created: 05.11.2025
- *  Updated: 25.11.2025
- *
- *  License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- */
-
+//
+// Created by dkueh on 05.11.2025.
+//
 
 #include "SIPParser.h"
 
 #include <iostream>
+#include <algorithm>
 #include <optional>
 #include <bitset>
 
-#include "../utils/sip_utils.h"
 
 namespace {
     struct UriParts {
@@ -282,7 +236,7 @@ namespace {
         msg.content_type = std::string{value};
     }
 
-    void parse_max_forward(std::string_view, std::string_view value, SIPMessage& msg) {
+    void parse_max_forwards(std::string_view, std::string_view value, SIPMessage& msg) {
         msg.max_forwards = std::string{value};
     }
 
@@ -314,7 +268,7 @@ namespace {
         parse_option_tags(value, msg.supported);
     }
 
-    void parse_required(std::string_view, std::string_view value, SIPMessage& msg) {
+    void parse_require(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_option_tags(value, msg.require);
     }
 
@@ -403,13 +357,13 @@ namespace {
         {"Call-ID",         "i", parse_call_id,         false},
         {"Content-Length",  "l", parse_content_length,  false},
         {"Content-Type",    "c", parse_content_type,    false},
-        {"Max-Forwards",    "", parse_max_forward,      false},
+        {"Max-Forwards",    "", parse_max_forwards,      false},
         {"Allow",           "", parse_allow,            true},
         {"From",        "f", parse_from,                false},
         {"To",          "t", parse_to,                  false},
         {"CSeq",            "", parse_cseq,             false},
         {"Supported",       "k", parse_supported,       true},
-        {"Require",         "", parse_required,         true},
+        {"Require",         "", parse_require,         true},
         {"Contact",     "m", parse_contact,             true},
         {"Via",         "v", parse_via,                 true},
         {"Route",           "", parse_route,            true},
@@ -443,9 +397,7 @@ namespace {
             const auto sp2 = start_line.find(' ', sp1 + 1);
             msg.status_code = start_line.substr(sp1 + 1, sp2 - sp1 - 1);
             msg.reason = (sp2 == std::string_view::npos) ? std::string_view{} : start_line.substr(sp2 + 1);
-        }
-
-        if (start_line.ends_with(" SIP/2.0")) {
+        } else if (start_line.ends_with(" SIP/2.0")) {
             msg.type = MessageType::REQUEST;
             const auto sp2 = start_line.rfind(' ');
             msg.method = start_line.substr(0, sp1);
@@ -489,7 +441,11 @@ SIPMessage SIPParser::parse_message(std::string_view sip_message) {
     }
 
     parse_rline(sip_message, message);
-    std::string_view sip_headers = sip_message.substr(request_line_end + 2, message_end - request_line_end - 2);
+
+    const auto headers_begin = request_line_end + 2;
+    std::string_view sip_headers = message_end > headers_begin
+        ? sip_message.substr(headers_begin, message_end - headers_begin)
+        : std::string_view{};
 
     SeenSet seen{};
 

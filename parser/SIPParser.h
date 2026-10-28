@@ -1,75 +1,74 @@
-/*
- *  Project SIPx
- *  -------------
- *  SIPx is a flexible and extensible SIP engine designed primarily for
- *  troubleshooting, edge-case testing, and IMS-related scenarios. Its main goal
- *  is to give developers and DevOps engineers the ability to inspect,
- *  manipulate, and stress-test SIP/SDP/RTP flows in detail, including realistic
- *  failure and corner-case simulations.
- *
- *  Description of SIPParser:
- *  --------------------------
- *  The SIPParser is a wrapper-class for usage with e.g. the SIPxApp of this project.
- *  It provides an interface where you can put a SIP-Message into and get the correct
- *  message-type-object (SIPResponse or SIPRequest) back.
- *  The logging-function is optional and log-messages where only generated if a pointer to
- *  an SIPLogWriter-object is given on instantiation of the SIPParser.
- *
- *  Main responsibilities:
- *    • Deciding if the message is a SIP-response or -request
- *    • Instantiate based on that decision the correct SIPResponse or SIPRequest object
- *    • Automatically activate logging if a SIPLogWriter is provided
- *    • Count parsed packets with this instance
- *
- *  Internal structure:
- *    • Only SIPLogWriter-pointer and a counter is hold in this object
- *    • Parsed messages are given back to the caller and are not hold here
- *
- *  Purpose and usage:
- *    The only purpose is to give a common interface for parsing the messages so that
- *    the caller doesn't have to think about what message-type to instantiate.
- *
- *  Author:  Dennis Kühnlein
- *  Version: v0.1
- *  Created: 05.11.2025
- *  Updated: 25.11.2025
- *
- *  License:
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- */
-
+//
+// Created by dkueh on 05.11.2025.
+//
 
 #ifndef PROJECT_SIPX_SIPPARSER_H
 #define PROJECT_SIPX_SIPPARSER_H
-
-#include <memory>
 
 #include "SIPMessage.h"
 #include "../eventhandler/EventHandler.h"
 #include "../eventhandler/EventDispatcher.h"
 #include "../logwriter/SIPLogWriter.h"
 
+/**
+ * @brief Parses raw SIP messages into plain SIPMessage structs.
+ *
+ * Handles requests and responses alike; the detected type is stored in
+ * SIPMessage::type. The parser only extracts text: no numeric conversion,
+ * no semantic validation, no modification or repair of the input.
+ *
+ * Known headers are matched case-insensitively in long and compact form.
+ * Every header line ends up in exactly one place:
+ *  - known header                         -> its dedicated field
+ *  - known header that cannot be split    -> SIPMessage::malformed_header (field stays empty)
+ *  - repeated single-value header         -> SIPMessage::duplicate_header, unparsed; the first
+ *                                            occurrence occupies the field, even if malformed
+ *  - malformed element of a list header   -> SIPMessage::malformed_header; valid elements
+ *                                            stay in the field
+ *  - unknown header                       -> SIPMessage::unknown_header (repetitions allowed)
+ * Missing or empty headers simply leave the field empty; no evaluation takes place.
+ *
+ * @note Framing is the caller's responsibility: parse_message() expects exactly one
+ *       complete message.
+ * @note Dispatcher and logger are optional and not owned; the caller must keep them
+ *       alive for the lifetime of the parser.
+ * @todo Line folding (continuation lines starting with SP/HTAB) is not supported yet.
+ * @todo on_event() does not forward the parsed message yet (Event::parsed_msg).
+ */
 class SIPParser : public EventHandler {
 public:
+    /**
+     * @brief Constructs the parser and registers it as listener if a dispatcher is given.
+     * @param disp Optional EventDispatcher; referenced, not owned.
+     * @param logger Optional SIPLogWriter; referenced, not owned. Logging is disabled if nullptr.
+     */
     explicit SIPParser(EventDispatcher* disp = nullptr, SIPLogWriter* logger = nullptr);
+
+    /**
+     * @brief Parses a single raw SIP message.
+     *
+     * The input is only read; all extracted values are copied into the returned
+     * struct, so the result stays valid after the input buffer is released.
+     *
+     * @param sip_message Complete raw SIP message incl. header terminator (CRLFCRLF).
+     * @return Parsed message. SIPMessage::is_complete is false if no header
+     *         terminator was found; all other fields are left empty in that case.
+     */
     SIPMessage parse_message(std::string_view sip_message);
+
+    /// @brief Number of messages parsed by this instance.
     [[nodiscard]] unsigned int get_paket_count() const { return m_paket_count; }
 
+    /**
+     * @brief Handles RAW_MESSAGE_RECEIVED by parsing the message and dispatching MESSAGE_PARSED.
+     * @param evt Incoming event; evt.raw_msg must point to a valid string for RAW_MESSAGE_RECEIVED.
+     */
     void on_event(Event& evt) override;
 
 private:
-    EventDispatcher* m_dispatcher = nullptr;
-    SIPLogWriter* m_logger = nullptr;
-    unsigned int m_paket_count = 0;
+    EventDispatcher* m_dispatcher = nullptr;    ///< Optional, not owned.
+    SIPLogWriter* m_logger = nullptr;           ///< Optional, not owned.
+    unsigned int m_paket_count = 0;             ///< Incremented per parse_message() call.
 
 };
 
