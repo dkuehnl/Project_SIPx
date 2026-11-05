@@ -45,6 +45,8 @@ struct Via {
     std::string port{};         ///< Sent-by port; empty if not present.
     std::string branch{};       ///< Value of the branch parameter.
     std::string params{};       ///< Remaining parameters (excluding branch), ';'-separated.
+
+    bool operator==(const Via&) const = default;
 };
 
 /// @brief Decomposed CSeq header.
@@ -70,6 +72,8 @@ struct Contact {
     std::string uri_params{};   ///< Remaining URI parameters (excluding transport), ';'-separated.
     std::string expires{};      ///< Value of the expires header parameter.
     std::string params{};       ///< Remaining header parameters (excluding expires), ';'-separated.
+
+    bool operator==(const Contact&) const = default;
 };
 
 /// @brief Raw header as received, used for unknown, malformed and duplicate headers.
@@ -102,25 +106,26 @@ struct SIPMessage {
     std::string status_code{};                  ///< Response only. Status code as text.
     std::string reason{};                       ///< Response only. Reason phrase; empty if not present.
 
-    NameAddr                    from{};             ///< From / f
-    NameAddr                    to{};               ///< To / t
-    std::vector<Via>            via{};              ///< Via / v - all via-parms in order of appearance.
-    std::vector<std::string>    route{};            ///< Route - raw entries in order of appearance.
-    std::vector<std::string>    record_route{};     ///< Record-Route - raw entries in order of appearance.
-    CSeq                        cseq{};             ///< CSeq
-    std::vector<Contact>        contacts{};         ///< Contact / m - all contact-params in order of appearance.
-    std::string                 call_id{};          ///< Call-ID / i
-    std::string                 content_length{};   ///< Content-Length / l. Not used for body framing.
-    std::string                 content_type{};     ///< Content-Type / c
-    std::string                 max_forwards{};     ///< Max-Forwards
-    std::vector<std::string>    allow{};            ///< Allow - method tokens across all lines.
-    std::vector<std::string>    supported{};        ///< Supported / k - option tags across all lines.
-    std::vector<std::string>    require{};          ///< Require - option tags across all lines.
+    NameAddr                    from{};                     ///< From / f
+    NameAddr                    to{};                       ///< To / t
+    std::vector<Via>            via{};                      ///< Via / v - all via-parms in order of appearance.
+    std::vector<std::string>    route{};                    ///< Route - raw entries in order of appearance.
+    std::vector<std::string>    record_route{};             ///< Record-Route - raw entries in order of appearance.
+    CSeq                        cseq{};                     ///< CSeq
+    std::vector<Contact>        contacts{};                 ///< Contact / m - all contact-params in order of appearance.
+    std::string                 call_id{};                  ///< Call-ID / i
+    std::string                 content_length{};           ///< Content-Length / l. Not used for body framing.
+    std::string                 content_type{};             ///< Content-Type / c
+    std::string                 max_forwards{};             ///< Max-Forwards
+    std::vector<std::string>    allow{};                    ///< Allow - method tokens across all lines.
+    std::vector<std::string>    supported{};                ///< Supported / k - option tags across all lines.
+    std::vector<std::string>    require{};                  ///< Require - option tags across all lines.
 
-    std::vector<Header>         unknown_header{};   ///< Headers without dedicated field, in order of appearance. Repetitions allowed.
-    std::vector<Header>         malformed_header{}; ///< Known headers or list elements that could not be decomposed.
-    std::vector<Header>         duplicate_header{}; ///< Repeated single-value headers, unparsed. First occurrence occupies the field.
-    std::string                 body{};             ///< Everything after the header terminator, raw.
+    std::vector<Header>         unknown_header{};           ///< Headers without dedicated field, in order of appearance. Repetitions allowed.
+    std::vector<Header>         malformed_header{};         ///< Known headers or list elements that could not be decomposed.
+    std::vector<Header>         duplicate_header{};         ///< Repeated single-value headers, unparsed. First occurrence occupies the field.
+    std::string                 malformed_start_line{};     ///< for non RFC-conform start-line
+    std::string                 body{};                     ///< Everything after the header terminator, raw.
 };
 
 #endif //PROJECT_SIPX_SIPMESSAGE_H

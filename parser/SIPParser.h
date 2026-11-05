@@ -57,7 +57,10 @@ public:
     SIPMessage parse_message(std::string_view sip_message);
 
     /// @brief Number of messages parsed by this instance.
-    [[nodiscard]] unsigned int get_paket_count() const { return m_paket_count; }
+    [[nodiscard]] unsigned int get_total_pkt_count() const { return m_total_pkt_count; }
+
+    /// @brief Number of incomplete messages parsed by this instance
+    [[nodiscard]] unsigned int get_incomplete_pkt_count() const { return m_incomplete_pkt_count; }
 
     /**
      * @brief Handles RAW_MESSAGE_RECEIVED by parsing the message and dispatching MESSAGE_PARSED.
@@ -68,7 +71,8 @@ public:
 private:
     EventDispatcher* m_dispatcher = nullptr;    ///< Optional, not owned.
     SIPLogWriter* m_logger = nullptr;           ///< Optional, not owned.
-    unsigned int m_paket_count = 0;             ///< Incremented per parse_message() call.
+    unsigned int m_total_pkt_count{0};          ///< Incremented per parse_message() call.
+    unsigned int m_incomplete_pkt_count{0};     ///< Incremented per parse_message() call.
 
 };
 
