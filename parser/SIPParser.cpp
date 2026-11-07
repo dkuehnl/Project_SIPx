@@ -9,6 +9,8 @@
 #include <optional>
 #include <bitset>
 
+#include "../eventhandler/EventDispatcher.h"
+#include "../logwriter/SIPLogWriter.h"
 
 namespace {
     struct UriParts {
@@ -86,7 +88,7 @@ namespace {
         UriParts p;
 
         const auto colon = uri.find(':');
-        if (colon == std::string_view::npos) return std::nullopt;
+        if (colon == std::string_view::npos || colon == 0) return std::nullopt;
         p.scheme = uri.substr(0, colon);
         uri.remove_prefix(colon + 1);
 
@@ -133,6 +135,8 @@ namespace {
 
             return NameAddrParts{trim(value.substr(lt + 1, gt - lt - 1)), value.substr(gt + 1)};
         }
+
+        if (search_from != 0) return std::nullopt;
 
         const auto semi = value.find(';');
         return NameAddrParts{trim(value.substr(0, semi)),
@@ -226,7 +230,7 @@ namespace {
         out.user    = uri->user;
         out.host    = uri->host;
         out.port    = uri->port;
-        out.uri_param = join_uri_params(std::string{uri->params}, uri->headers);
+        out.uri_params = join_uri_params(std::string{uri->params}, uri->headers);
         out.params  = take_param(na->params, "tag", out.tag);
 
         return true;
@@ -267,26 +271,6 @@ namespace {
         }
     }
 
-    void parse_call_id(std::string_view, std::string_view value, SIPMessage& msg) {
-        msg.call_id = std::string{value};
-    }
-
-    void parse_content_length(std::string_view, std::string_view value, SIPMessage& msg) {
-        msg.content_length = std::string{value};
-    }
-
-    void parse_content_type(std::string_view, std::string_view value, SIPMessage& msg) {
-        msg.content_type = std::string{value};
-    }
-
-    void parse_max_forwards(std::string_view, std::string_view value, SIPMessage& msg) {
-        msg.max_forwards = std::string{value};
-    }
-
-    void parse_allow(std::string_view, std::string_view value, SIPMessage& msg) {
-        parse_option_tags(value, msg.allow);
-    }
-
     void parse_from(std::string_view name, std::string_view value, SIPMessage& msg) {
         if (!parse_name_addr(value, msg.from)) add_malformed(msg, name, value);
     }
@@ -306,14 +290,6 @@ namespace {
 
         msg.cseq.number = trim(value.substr(0, sep));
         msg.cseq.method = trim(value.substr(sep + 1));
-    }
-
-    void parse_supported(std::string_view, std::string_view value, SIPMessage& msg) {
-        parse_option_tags(value, msg.supported);
-    }
-
-    void parse_require(std::string_view, std::string_view value, SIPMessage& msg) {
-        parse_option_tags(value, msg.require);
     }
 
     void parse_contact(std::string_view name, std::string_view value, SIPMessage& msg) {
@@ -401,14 +377,6 @@ namespace {
         }
     }
 
-    void parse_route(std::string_view, std::string_view value, SIPMessage& msg) {
-        parse_route_list(value, msg.route);
-    }
-
-    void parse_record_route(std::string_view, std::string_view value, SIPMessage& msg) {
-        parse_route_list(value, msg.record_route);
-    }
-
     using Handler = void (*)(std::string_view name, std::string_view value, SIPMessage& msg);
 
     struct KnownHeader {
@@ -418,21 +386,36 @@ namespace {
         bool multi;
     };
 
+    template <std::string SIPMessage::* Field>
+    void parse_text(std::string_view, std::string_view value, SIPMessage& msg) {
+        msg.*Field = value;
+    }
+
+    template <std::vector<std::string> SIPMessage::* Field>
+    void parse_tags(std::string_view, std::string_view value, SIPMessage& msg) {
+        parse_option_tags(value, msg.*Field);
+    }
+
+    template <std::vector<std::string> SIPMessage::*Field>
+    void parse_routes(std::string_view, std::string_view value, SIPMessage& msg) {
+        parse_route_list(value, msg.*Field);
+    }
+
     constexpr KnownHeader kKnownHeaders[] = {
-        {"Call-ID",         "i", parse_call_id,         false},
-        {"Content-Length",  "l", parse_content_length,  false},
-        {"Content-Type",    "c", parse_content_type,    false},
-        {"Max-Forwards",    "", parse_max_forwards,      false},
-        {"Allow",           "", parse_allow,            true},
-        {"From",        "f", parse_from,                false},
-        {"To",          "t", parse_to,                  false},
-        {"CSeq",            "", parse_cseq,             false},
-        {"Supported",       "k", parse_supported,       true},
-        {"Require",         "", parse_require,         true},
-        {"Contact",     "m", parse_contact,             true},
-        {"Via",         "v", parse_via,                 true},
-        {"Route",           "", parse_route,            true},
-        {"Record-Route",    "", parse_record_route,     true}
+        {"Call-ID",         "i", parse_text<&SIPMessage::call_id>,         false},
+        {"Content-Length",  "l", parse_text<&SIPMessage::content_length>,  false},
+        {"Content-Type",    "c", parse_text<&SIPMessage::content_type>,    false},
+        {"Max-Forwards",    "",  parse_text<&SIPMessage::max_forwards>,    false},
+        {"Allow",           "",  parse_tags<&SIPMessage::allow>,           true},
+        {"From",            "f", parse_from,                               false},
+        {"To",              "t", parse_to,                                 false},
+        {"CSeq",            "",  parse_cseq,                               false},
+        {"Supported",       "k", parse_tags<&SIPMessage::supported>,       true},
+        {"Require",         "",  parse_tags<&SIPMessage::require>,         true},
+        {"Contact",         "m", parse_contact,                            true},
+        {"Via",             "v", parse_via,                                true},
+        {"Route",           "",  parse_routes<&SIPMessage::route>,         true},
+        {"Record-Route",    "",  parse_routes<&SIPMessage::record_route>,  true}
     };
 
     using SeenSet = std::bitset<std::size(kKnownHeaders)>;

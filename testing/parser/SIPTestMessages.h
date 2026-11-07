@@ -198,5 +198,10 @@ namespace sipx::test::msg {
         "Content-Length: 0\r\n"
         "\r\n";
 
+    inline constexpr std::string_view Malformed_URI_Header_MSG =
+        "OPTIONS sip:x SIP/2.0\r\n"
+        "From: \"Test\" sip:bob@b.example.com;tag=111\r\n"
+        "To: <:bob@b.example.com>\r\n"
+        "\r\n";
 }
 #endif //PROJECT_SIPX_SIPTESTMESSAGES_H

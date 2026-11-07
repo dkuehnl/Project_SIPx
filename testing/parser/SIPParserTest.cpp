@@ -85,7 +85,7 @@ namespace {
         EXPECT_EQ(message.to.port, "5555");
         EXPECT_EQ(message.to.tag, "12354");
         EXPECT_EQ(message.to.params, "");
-        EXPECT_EQ(message.to.uri_param, "transport=tcp");
+        EXPECT_EQ(message.to.uri_params, "transport=tcp");
     }
 
     TEST_F(SIPParserTest, PutSecondTagInURIParams) {
@@ -197,7 +197,7 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Response_200_MSG);
 
         EXPECT_THAT(message.unknown_header, ::testing::Contains(
-            Header{"Session-Expires", "1800"}
+            Header{.name = "Session-Expires", .value = "1800"}
             ));
     }
 
@@ -219,10 +219,10 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Malformed_INVITE_MSG);
 
         EXPECT_THAT(message.duplicate_header, ::testing::ElementsAre(
-            Header{"t","<sip:carol@c.example.com"},
-            Header{"i","def@a.example.com"},
-            Header{"Call-ID","ghi@a.example.com"},
-            Header{"CSeq","2 INVITE"}
+            Header{.name = "t",.value = "<sip:carol@c.example.com"},
+            Header{.name = "i",.value = "def@a.example.com"},
+            Header{.name = "Call-ID",.value = "ghi@a.example.com"},
+            Header{.name = "CSeq",.value = "2 INVITE"}
         ));
     }
 
@@ -230,11 +230,11 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Malformed_INVITE_MSG);
 
         EXPECT_THAT(message.malformed_header, ::testing::ElementsAre(
-            Header{"Via","SIP/2.0/UDP"},
-            Header{"Via","SIP/2.0/TCP [2001:db8::1;branch=z9hG4bK2"},
-            Header{"From","\"Alice <sip:alice@a.example.com>;tag=1"},
-            Header{"CSeq","1"},
-            Header{"Contact","<alice-no-scheme>"}
+            Header{.name = "Via",.value = "SIP/2.0/UDP"},
+            Header{.name = "Via",.value = "SIP/2.0/TCP [2001:db8::1;branch=z9hG4bK2"},
+            Header{.name = "From",.value = "\"Alice <sip:alice@a.example.com>;tag=1"},
+            Header{.name = "CSeq",.value = "1"},
+            Header{.name = "Contact",.value = "<alice-no-scheme>"}
         ));
     }
 
@@ -242,8 +242,8 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Malformed_INVITE_MSG);
 
         EXPECT_THAT(message.unknown_header, ::testing::ElementsAre(
-            Header{"P-Asserted-Identity","<sip:alice@a.example.com>"},
-            Header{"P-Asserted-Identity","<tel:+4930123>"}
+            Header{.name = "P-Asserted-Identity",.value = "<sip:alice@a.example.com>"},
+            Header{.name = "P-Asserted-Identity",.value = "<tel:+4930123>"}
         ));
     }
 
@@ -276,7 +276,7 @@ namespace {
         EXPECT_EQ(message.cseq.number, "314159");
         EXPECT_EQ(message.cseq.method, "INVITE");
         EXPECT_THAT(message.unknown_header, ::testing::Contains(
-            Header{"Subject", "I know you're there, pick up the phone and talk to me!"}
+            Header{.name = "Subject", .value = "I know you're there, pick up the phone and talk to me!"}
             ));
         EXPECT_EQ(message.supported.size(), 3);
         EXPECT_EQ(message.malformed_header.size(), 0);
@@ -290,7 +290,7 @@ namespace {
         EXPECT_EQ(message.via.size(), 0);
         EXPECT_EQ(message.malformed_header.size(), 1);
         EXPECT_THAT(message.malformed_header, ::testing::Contains(
-            Header{"", "Via: SIP/2.0/UDP pc33.atlanta.example.com;branch=z9hG4bK776asdhds"}
+            Header{.name = "", .value = "Via: SIP/2.0/UDP pc33.atlanta.example.com;branch=z9hG4bK776asdhds"}
         ));
         EXPECT_EQ(message.call_id, "a84b4c76e66710@pc33.atlanta.example.com");
     }
@@ -313,7 +313,7 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Message_WithoutColons);
 
         EXPECT_THAT(message.malformed_header, ::testing::Contains(
-            Header{"", "X-Header"}
+            Header{.name = "", .value = "X-Header"}
         ));
     }
 
@@ -321,7 +321,7 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Message_WithoutColons);
 
         EXPECT_THAT(message.malformed_header, ::testing::Contains(
-            Header{"", ": testvalue"}
+            Header{.name = "", .value = ": testvalue"}
         ));
     }
 
@@ -329,12 +329,12 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Via_Whitespace_MSG);
 
         EXPECT_THAT(message.via, ::testing::ElementsAre(
-            Via{"SIP/2.0/UDP", "pc33.atlanta.example.com", "5060", "z9hG4bK1"},
-            Via{"SIP/2.0/TCP", "[2001:db8::1]", "5061", "z9hG4bK2"}
+            Via{.transport = "SIP/2.0/UDP", .host = "pc33.atlanta.example.com", .port = "5060", .branch = "z9hG4bK1"},
+            Via{.transport = "SIP/2.0/TCP", .host = "[2001:db8::1]", .port = "5061", .branch = "z9hG4bK2"}
         ));
         EXPECT_THAT(message.malformed_header, ::testing::ElementsAre(
-            Header{"v", "SIP/2.0/UDP proxy.example.com junk;branch=z9hG4bK3"},
-            Header{"Via", "SIP/2.0/UDP ;branch=z9hG4bK4"}
+            Header{.name = "v", .value = "SIP/2.0/UDP proxy.example.com junk;branch=z9hG4bK3"},
+            Header{.name = "Via", .value = "SIP/2.0/UDP ;branch=z9hG4bK4"}
         ));
         EXPECT_EQ(message.cseq.method, "INVITE");
         EXPECT_EQ(message.cseq.number, "314159");
@@ -344,15 +344,15 @@ namespace {
         const auto message = m_parser.parse_message(sipx::test::msg::Via_Whitespace_MSG);
 
         EXPECT_EQ(message.from.host, "b.example.com");
-        EXPECT_EQ(message.from.uri_param, "?subject=x");
+        EXPECT_EQ(message.from.uri_params, "?subject=x");
         EXPECT_THAT(message.contacts, ::testing::ElementsAre(
             Contact{
-            "sip",
-            "a",
-            "b",
-            "",
-            "tcp",
-            "?subject=x&priority=urgent"
+            .scheme = "sip",
+            .user = "a",
+            .host = "b",
+            .port = "",
+            .transport = "tcp",
+            .uri_params ="?subject=x&priority=urgent"
             }
         ));
     }
@@ -377,5 +377,14 @@ namespace {
             "Content-Length: 0\r\n"
             "\r\n"
         );
+    }
+
+    TEST_F(SIPParserTest, ParseMalformedURIHeader) {
+        const auto message = m_parser.parse_message(sipx::test::msg::Malformed_URI_Header_MSG);
+
+        EXPECT_THAT(message.malformed_header, ::testing::ElementsAre(
+            Header{.name = "From", .value = "\"Test\" sip:bob@b.example.com;tag=111"},
+            Header{.name = "To", .value = "<:bob@b.example.com>"}
+            ));
     }
 };

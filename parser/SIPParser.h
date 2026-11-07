@@ -7,8 +7,10 @@
 
 #include "SIPMessage.h"
 #include "../eventhandler/EventHandler.h"
-#include "../eventhandler/EventDispatcher.h"
-#include "../logwriter/SIPLogWriter.h"
+
+
+class EventDispatcher;
+class SIPLogWriter;
 
 /**
  * @brief Parses raw SIP messages into plain SIPMessage structs.

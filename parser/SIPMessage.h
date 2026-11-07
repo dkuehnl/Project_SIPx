@@ -27,7 +27,7 @@ struct NameAddr {
     std::string user{};         ///< User part of the URI; complete number for tel-URIs.
     std::string host{};         ///< Host part, incl. brackets for IPv6 references.
     std::string port{};
-    std::string uri_param{};    ///< Raw URI parameters, without leading ';'.
+    std::string uri_params{};   ///< Raw URI parameters, without leading ';'.
     std::string tag{};          ///< Value of the tag header parameter.
     std::string params{};       ///< Remaining header parameters (excluding tag), ';'-separated.
 
