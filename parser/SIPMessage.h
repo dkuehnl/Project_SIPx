@@ -26,6 +26,7 @@ struct NameAddr {
     std::string scheme{};       ///< URI scheme, e.g. "sip", "sips", "tel".
     std::string user{};         ///< User part of the URI; complete number for tel-URIs.
     std::string host{};         ///< Host part, incl. brackets for IPv6 references.
+    std::string port{};
     std::string uri_param{};    ///< Raw URI parameters, without leading ';'.
     std::string tag{};          ///< Value of the tag header parameter.
     std::string params{};       ///< Remaining header parameters (excluding tag), ';'-separated.
@@ -73,7 +74,7 @@ struct Contact {
     std::string expires{};      ///< Value of the expires header parameter.
     std::string params{};       ///< Remaining header parameters (excluding expires), ';'-separated.
 
-    bool operator==(const Contact&) const = default;
+    bool operator==(const Contact&) const = default; 
 };
 
 /// @brief Raw header as received, used for unknown, malformed and duplicate headers.

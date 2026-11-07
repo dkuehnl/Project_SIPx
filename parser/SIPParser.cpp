@@ -17,6 +17,7 @@ namespace {
         std::string_view host{};
         std::string_view port{};
         std::string_view params{};
+        std::string_view headers{};
     };
 
     struct NameAddrParts {
@@ -60,6 +61,27 @@ namespace {
         return std::string_view::npos;
     }
 
+    std::optional<HostPort> split_hostport(std::string_view value) {
+        std::size_t host_end = 0;
+        if (!value.empty() && value.front() == '[') {
+            const auto rb = value.find(']');
+            if (rb == std::string_view::npos) return std::nullopt;
+            host_end = rb + 1;
+        } else {
+            host_end = std::min(value.find_first_of(" \t:"), value.size());
+        }
+
+        HostPort hp{value.substr(0, host_end), {}};
+        if (hp.host.empty()) return std::nullopt;
+
+        const auto rest = trim(value.substr(host_end));
+        if (rest.empty()) return hp;
+        if (rest.front() != ':') return std::nullopt;
+
+        hp.port = trim(rest.substr(1));
+        return hp;
+    }
+
     std::optional<UriParts> split_uri(std::string_view uri) {
         UriParts p;
 
@@ -67,6 +89,11 @@ namespace {
         if (colon == std::string_view::npos) return std::nullopt;
         p.scheme = uri.substr(0, colon);
         uri.remove_prefix(colon + 1);
+
+        if (const auto q = uri.find('?'); q != std::string_view::npos) {
+            p.headers = uri.substr(q + 1);
+            uri = uri.substr(0, q);
+        }
 
         if (const auto semi = uri.find(';'); semi != std::string_view::npos) {
             p.params = uri.substr(semi + 1);
@@ -83,19 +110,11 @@ namespace {
             uri.remove_prefix(at + 1);
         }
 
-        std::size_t host_end = 0;
-        if (!uri.empty() && uri.front() == '[') {
-            const auto rb = uri.find(']');
-            if (rb == std::string_view::npos) return std::nullopt;
-            host_end = rb + 1;
-        } else {
-            host_end = std::min(uri.find(':'), uri.size());
-        }
+        const auto host_port = split_hostport(uri);
+        if (!host_port) return std::nullopt;
 
-        p.host = uri.substr(0, host_end);
-        if (host_end < uri.size() && uri[host_end] == ':') {
-            p.port = uri.substr(host_end + 1);
-        }
+        p.host = host_port->host;
+        p.port = host_port->port;
 
         return p;
     }
@@ -124,6 +143,7 @@ namespace {
 
     std::string take_param(std::string_view params, std::string_view key, std::string& value) {
         std::string rest;
+        bool found{false};
 
         params = trim(params);
         if (!params.empty() && params.front() == ';') params.remove_prefix(1);
@@ -136,8 +156,9 @@ namespace {
             if (param.empty()) continue;
 
             const auto eq = param.find('=');
-            if (eq != std::string_view::npos && iequals(trim(param.substr(0, eq)), key)) {
+            if (!found && eq != std::string_view::npos && iequals(trim(param.substr(0, eq)), key)) {
                 value = trim(param.substr(eq + 1));
+                found = true;
                 continue;
             }
 
@@ -145,6 +166,15 @@ namespace {
             rest += param;
          }
         return rest;
+    }
+
+    std::string join_uri_params(std::string params, std::string_view headers) {
+        if (!headers.empty()) {
+            params += '?';
+            params += headers;
+        }
+
+        return params;
     }
 
     std::string_view next_list_item(std::string_view& rest) {
@@ -195,31 +225,11 @@ namespace {
         out.scheme  = uri->scheme;
         out.user    = uri->user;
         out.host    = uri->host;
-        out.uri_param = uri->params;
+        out.port    = uri->port;
+        out.uri_param = join_uri_params(std::string{uri->params}, uri->headers);
         out.params  = take_param(na->params, "tag", out.tag);
 
         return true;
-    }
-
-    std::optional<HostPort> split_hostport(std::string_view value) {
-        std::size_t host_end = 0;
-        if (!value.empty() && value.front() == '[') {
-            const auto rb = value.find(']');
-            if (rb == std::string_view::npos) return std::nullopt;
-            host_end = rb + 1;
-        } else {
-            host_end = std::min(value.find_first_of(" \t:"), value.size());
-        }
-
-        HostPort hp{value.substr(0, host_end), {}};
-        if (hp.host.empty()) return std::nullopt;
-
-        const auto rest = trim(value.substr(host_end));
-        if (rest.empty()) return hp;
-        if (rest.front() != ':') return std::nullopt;
-
-        hp.port = trim(rest.substr(1));
-        return hp;
     }
 
     std::string_view next_line(std::string_view& rest) noexcept {
@@ -324,7 +334,7 @@ namespace {
             c.user      = uri->user;
             c.host      = uri->host;
             c.port      = uri->port;
-            c.uri_params = take_param(uri->params, "transport", c.transport);
+            c.uri_params = join_uri_params(take_param(uri->params, "transport", c.transport), uri->headers);
             c.params    = take_param(na->params, "expires", c.expires);
         }
     }

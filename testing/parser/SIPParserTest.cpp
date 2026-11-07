@@ -82,9 +82,17 @@ namespace {
         EXPECT_EQ(message.to.scheme, "sip");
         EXPECT_EQ(message.to.user, "bob222");
         EXPECT_EQ(message.to.host, "ims.telekom.de");
+        EXPECT_EQ(message.to.port, "5555");
         EXPECT_EQ(message.to.tag, "12354");
         EXPECT_EQ(message.to.params, "");
         EXPECT_EQ(message.to.uri_param, "transport=tcp");
+    }
+
+    TEST_F(SIPParserTest, PutSecondTagInURIParams) {
+        const auto message = m_parser.parse_message(sipx::test::msg::INVITE_double_Tag_MSG);
+
+        EXPECT_EQ(message.from.tag, "54321");
+        EXPECT_EQ(message.from.params, "tag=1111");
     }
 
     TEST_F(SIPParserTest, ParseCSeq) {
@@ -330,5 +338,44 @@ namespace {
         ));
         EXPECT_EQ(message.cseq.method, "INVITE");
         EXPECT_EQ(message.cseq.number, "314159");
+    }
+
+    TEST_F(SIPParserTest, MapQuestionMarkToUriParams) {
+        const auto message = m_parser.parse_message(sipx::test::msg::Via_Whitespace_MSG);
+
+        EXPECT_EQ(message.from.host, "b.example.com");
+        EXPECT_EQ(message.from.uri_param, "?subject=x");
+        EXPECT_THAT(message.contacts, ::testing::ElementsAre(
+            Contact{
+            "sip",
+            "a",
+            "b",
+            "",
+            "tcp",
+            "?subject=x&priority=urgent"
+            }
+        ));
+    }
+
+    TEST_F(SIPParserTest, ParseEmptyHeaderSection) {
+        const auto message = m_parser.parse_message(sipx::test::msg::Empty_Header_section_MSG);
+
+        EXPECT_TRUE(message.is_complete);
+        EXPECT_EQ(message.type, MessageType::REQUEST);
+        EXPECT_EQ(message.method, "OPTIONS");
+        EXPECT_EQ(message.request_uri, "sip:x");
+
+        EXPECT_EQ(message.via.size(), 0);
+        EXPECT_EQ(message.contacts.size(), 0);
+
+        EXPECT_EQ(message.body,
+            "Via: SIP/2.0/TCP\t[2001:db8::1]:5061;branch=z9hG4bK2\r\n"
+            "Call-ID: a84b4c76e66710@pc33.atlanta.example.com\r\n"
+            "CSeq: 314159\tINVITE\r\n"
+            "Contact: <sip:a@b;transport=tcp?subject=x&priority=urgent>\r\n"
+            "From: <sip:bob@b.example.com?subject=x>\r\n"
+            "Content-Length: 0\r\n"
+            "\r\n"
+        );
     }
 };

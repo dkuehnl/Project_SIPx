@@ -13,7 +13,7 @@ namespace sipx::test::msg {
         "Via: SIP/2.0/UDP client.example.com:5060;branch=z9hG4bK-12345\r\n"
         "Max-Forwards: 70\r\n"
         "From: <sip:alice111112@ims.telekom.de>;tag=54321\r\n"
-        "To: \"dsaflkjdlkj\" <sip:bob222@ims.telekom.de;transport=tcp>;tag=12354\r\n"
+        "To: \"dsaflkjdlkj\" <sip:bob222@ims.telekom.de:5555;transport=tcp>;tag=12354\r\n"
         "Call-ID: 1234567890@client.example.com\r\n"
         "P-Asserted-Identity: <sip:+49123456789@tel.t-online.de>\r\n"
         "p-preferred-identity: <sip:4911111111@192.168.178.1:5060>\r\n"
@@ -30,6 +30,20 @@ namespace sipx::test::msg {
         "t=0 0\r\n"
         "m=audio 49170 RTP/AVP 0\r\n"
         "a=rtpmap:0 PCMU/8000\r\n";
+
+    inline constexpr std::string_view INVITE_double_Tag_MSG =
+        "INVITE sip:bob@ims.telekom.de SIP/2.0\r\n"
+        "Via: SIP/2.0/UDP client.example.com:5060;branch=z9hG4bK-12345\r\n"
+        "Max-Forwards: 70\r\n"
+        "From: <sip:alice111112@ims.telekom.de>;tag=54321;tag=1111\r\n"
+        "To: \"dsaflkjdlkj\" <sip:bob222@ims.telekom.de:5555;transport=tcp>;tag=12354\r\n"
+        "Call-ID: 1234567890@client.example.com\r\n"
+        "CSeq: 1 INVITE\r\n"
+        "Allow: INVITE, ACK, OPTIONS, BYE, CANCEL, REGISTER, INFO, UPDATE, PRACK\r\n"
+        "Contact: <sip:alice@client.example.com:5060;transport=tcp>;expires=200\r\n"
+        "Content-Type: application/sdp\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n";
 
     inline constexpr std::string_view brocken_INVITE_MSG =
         "INVITE sip:bob@ims.telekom.de SIP/2.0\r\n"
@@ -169,9 +183,20 @@ namespace sipx::test::msg {
         "Via: SIP/2.0/UDP ;branch=z9hG4bK4\r\n"
         "Call-ID: a84b4c76e66710@pc33.atlanta.example.com\r\n"
         "CSeq: 314159\tINVITE\r\n"
+        "Contact: <sip:a@b;transport=tcp?subject=x&priority=urgent>\r\n"
+        "From: <sip:bob@b.example.com?subject=x>\r\n"
         "Content-Length: 0\r\n"
         "\r\n";
 
+    inline constexpr std::string_view Empty_Header_section_MSG =
+        "OPTIONS sip:x SIP/2.0\r\n\r\n"
+        "Via: SIP/2.0/TCP\t[2001:db8::1]:5061;branch=z9hG4bK2\r\n"
+        "Call-ID: a84b4c76e66710@pc33.atlanta.example.com\r\n"
+        "CSeq: 314159\tINVITE\r\n"
+        "Contact: <sip:a@b;transport=tcp?subject=x&priority=urgent>\r\n"
+        "From: <sip:bob@b.example.com?subject=x>\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n";
 
 }
 #endif //PROJECT_SIPX_SIPTESTMESSAGES_H
