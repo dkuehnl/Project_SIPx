@@ -13,6 +13,7 @@
 #include "../logwriter/SIPLogWriter.h"
 
 namespace {
+    /// @brief Views on the parts of a SIP/SIPS/TEL URI; all point into the input.
     struct UriParts {
         std::string_view scheme{};
         std::string_view user{};
@@ -22,19 +23,23 @@ namespace {
         std::string_view headers{};
     };
 
+    /// @brief addr-spec and the raw header parameters following it.
     struct NameAddrParts {
         std::string_view addr{};
         std::string_view params{};
     };
 
+    /// @brief Host and optional port of a hostport / sent-by.
     struct HostPort {
         std::string_view host{};
         std::string_view port{};
     };
 
     constexpr std::string_view SipVersion = "SIP/2.0";
+    /// @brief true for SP and HTAB.
     constexpr bool is_wsp(char c) noexcept { return c == ' ' || c == '\t'; }
 
+    /// @brief Strips leading and trailing SP/HTAB.
     constexpr std::string_view trim(std::string_view s) noexcept {
         while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
         while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
@@ -45,6 +50,7 @@ namespace {
         return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
     }
 
+    /// @brief ASCII case-insensitive comparison.
     constexpr bool iequals(std::string_view a, std::string_view b) noexcept {
         if (a.size() != b.size()) return false;
         for (std::size_t i = 0; i < a.size(); ++i) {
@@ -54,6 +60,7 @@ namespace {
         return true;
     }
 
+    /// @brief Position of the closing '"' of a quoted-string starting at s[0]; honours '\\' escapes.
     std::size_t find_closing_quote(std::string_view s) noexcept {
         for (std::size_t i = 1; i < s.size(); ++i) {
             if (s[i] == '\\') { ++i; continue; }
@@ -63,6 +70,10 @@ namespace {
         return std::string_view::npos;
     }
 
+    /**
+     * @brief Splits host [SWS ':' SWS port]; IPv6 references keep their brackets.
+     * @return nullopt for an empty host, an unclosed '[' or trailing text after the host.
+     */
     std::optional<HostPort> split_hostport(std::string_view value) {
         std::size_t host_end = 0;
         if (!value.empty() && value.front() == '[') {
@@ -84,6 +95,13 @@ namespace {
         return hp;
     }
 
+    /**
+     * @brief Splits a URI into scheme, user, host, port, parameters and headers.
+     *
+     * URI headers ('?' ...) are cut off first, then parameters (';' ...). For tel-URIs
+     * the complete number ends up in user.
+     * @return nullopt for a missing or empty scheme or an invalid hostport.
+     */
     std::optional<UriParts> split_uri(std::string_view uri) {
         UriParts p;
 
@@ -121,6 +139,10 @@ namespace {
         return p;
     }
 
+    /**
+     * @brief Separates name-addr / addr-spec from the header parameters.
+     * @return nullopt for an unclosed '"' or '<', or a quoted display-name without '<'.
+     */
     std::optional<NameAddrParts> split_name_addr(std::string_view value) {
         std::size_t search_from = 0;
         if (!value.empty() && value.front() == '"') {
@@ -145,6 +167,10 @@ namespace {
             : value.substr(semi) };
     }
 
+    /**
+     * @brief Extracts the first parameter named key (case-insensitive) into value.
+     * @return All remaining parameters incl. repeated keys, ';'-separated and trimmed.
+     */
     std::string take_param(std::string_view params, std::string_view key, std::string& value) {
         std::string rest;
         bool found{false};
@@ -172,6 +198,7 @@ namespace {
         return rest;
     }
 
+    /// @brief Appends URI headers as "?headers" to the URI parameters, if present.
     std::string join_uri_params(std::string params, std::string_view headers) {
         if (!headers.empty()) {
             params += '?';
@@ -181,6 +208,7 @@ namespace {
         return params;
     }
 
+    /// @brief Returns the next comma-separated element; commas inside quotes and '<...>' are ignored.
     std::string_view next_list_item(std::string_view& rest) {
         bool in_quotes{false};
         bool in_angle{false};
@@ -209,10 +237,12 @@ namespace {
         return item;
     }
 
+    /// @brief Stores a header or list element that could not be decomposed.
     void add_malformed(SIPMessage& msg, std::string_view name, std::string_view value) {
         msg.malformed_header.push_back({std::string{name}, std::string{value}});
     }
 
+    /// @brief Decomposes a From/To value into out; false if it is malformed.
     bool parse_name_addr(std::string_view value, NameAddr& out) {
         const auto na = split_name_addr(value);
         if (!na) {
@@ -236,6 +266,7 @@ namespace {
         return true;
     }
 
+    /// @brief Returns the next line without CRLF and advances rest.
     std::string_view next_line(std::string_view& rest) noexcept {
         const auto eol = rest.find("\r\n");
         const auto line = rest.substr(0, eol);
@@ -244,6 +275,12 @@ namespace {
         return line;
     }
 
+    /**
+     * @brief Returns the next logical header line incl. its continuation lines.
+     *
+     * Without folding the view points into rest, otherwise into unfold_buf (each LWS run
+     * replaced by a single SP). The view is only valid until the next call.
+     */
     std::string_view next_header_line(std::string_view& rest, std::string& unfold_buf) {
         const auto first = next_line(rest);
         if (rest.empty() || !is_wsp(rest.front())) return first;
@@ -261,6 +298,7 @@ namespace {
         return unfold_buf;
     }
 
+    /// @brief Splits a comma-separated token list; empty elements are skipped.
     void parse_option_tags(std::string_view value, std::vector<std::string>& out) {
         while (!value.empty()) {
             const auto comma = value.find(',');
@@ -315,6 +353,10 @@ namespace {
         }
     }
 
+    /**
+     * @brief Reads sent-protocol (name SLASH version SLASH transport) into out without whitespace.
+     * @return Remainder after the separating LWS (sent-by and parameters), or nullopt if malformed.
+     */
     std::optional<std::string_view> take_sent_protocol(std::string_view item, std::string& out) {
         out.clear();
 
@@ -370,6 +412,7 @@ namespace {
         }
     }
 
+    /// @brief Stores every non-empty list element raw.
     void parse_route_list(std::string_view value, std::vector<std::string>& out) {
         while (!value.empty()) {
             const auto item = next_list_item(value);
@@ -377,8 +420,10 @@ namespace {
         }
     }
 
+    /// @brief Handler signature: header name as received, trimmed value, target message.
     using Handler = void (*)(std::string_view name, std::string_view value, SIPMessage& msg);
 
+    /// @brief Entry of the known-header table; multi marks list headers allowed to repeat.
     struct KnownHeader {
         std::string_view name;
         std::string_view compact;
@@ -386,21 +431,25 @@ namespace {
         bool multi;
     };
 
+    /// @brief Handler for plain single-value text headers.
     template <std::string SIPMessage::* Field>
     void parse_text(std::string_view, std::string_view value, SIPMessage& msg) {
         msg.*Field = value;
     }
 
+    /// @brief Handler for comma-separated token lists (Allow, Supported, Require).
     template <std::vector<std::string> SIPMessage::* Field>
     void parse_tags(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_option_tags(value, msg.*Field);
     }
 
+    /// @brief Handler for Route / Record-Route, entries stored raw.
     template <std::vector<std::string> SIPMessage::*Field>
     void parse_routes(std::string_view, std::string_view value, SIPMessage& msg) {
         parse_route_list(value, msg.*Field);
     }
 
+    /// @brief All headers with a dedicated field in SIPMessage.
     constexpr KnownHeader kKnownHeaders[] = {
         {"Call-ID",         "i", parse_text<&SIPMessage::call_id>,         false},
         {"Content-Length",  "l", parse_text<&SIPMessage::content_length>,  false},
@@ -418,9 +467,11 @@ namespace {
         {"Record-Route",    "",  parse_routes<&SIPMessage::record_route>,  true}
     };
 
+    /// @brief One bit per known header, used for duplicate detection of single-value headers.
     using SeenSet = std::bitset<std::size(kKnownHeaders)>;
     enum class DispatchResult : uint8_t { Known, Duplicate, Unknown };
 
+    /// @brief Looks up header_name in kKnownHeaders and calls its handler unless it is a duplicate.
     DispatchResult dispatch(std::string_view header_name, std::string_view value, SIPMessage& msg, SeenSet& seen) {
         for (std::size_t i = 0; i < std::size(kKnownHeaders); ++i) {
             const auto& k = kKnownHeaders[i];
@@ -435,6 +486,7 @@ namespace {
         return DispatchResult::Unknown;
     }
 
+    /// @brief Parses "SIP/2.0" SP code [SP reason]; leaves msg untouched on failure.
     bool parse_status_line(std::string_view line, SIPMessage& msg) {
         if (!line.starts_with(SipVersion)
             || line.size() <= SipVersion.size()
@@ -451,6 +503,7 @@ namespace {
         return true;
     }
 
+    /// @brief Parses Method SP Request-URI SP "SIP/2.0"; leaves msg untouched on failure.
     bool parse_request_line(std::string_view line, SIPMessage& msg) {
         const auto sp1 = line.find(' ');
         const auto sp2 = line.rfind(' ');
@@ -471,6 +524,7 @@ namespace {
         return true;
     }
 
+    /// @brief Detects request or response; stores the raw line as malformed_start_line otherwise.
     void parse_start_line(std::string_view line, SIPMessage& msg) {
         if (parse_status_line(line, msg) || parse_request_line(line, msg)) return;
         msg.malformed_start_line = line;

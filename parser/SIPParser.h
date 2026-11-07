@@ -19,6 +19,15 @@ class SIPLogWriter;
  * SIPMessage::type. The parser only extracts text: no numeric conversion,
  * no semantic validation, no modification or repair of the input.
  *
+ * The start-line is checked structurally only: a Request-Line needs exactly three
+ * non-empty tokens separated by single SP and ending in "SIP/2.0", a Status-Line
+ * starts with "SIP/2.0" SP and a non-empty status code. Anything else sets
+ * SIPMessage::type to UNKNOWN and stores the raw line in
+ * SIPMessage::malformed_start_line; headers and body are parsed regardless.
+ *
+ * Folded header lines (continuation lines starting with SP/HTAB) are unfolded
+ * before parsing, each LWS run replaced by a single SP (RFC 3261 §7.3.1, §25.1).
+ *
  * Known headers are matched case-insensitively in long and compact form.
  * Every header line ends up in exactly one place:
  *  - known header                         -> its dedicated field
@@ -28,13 +37,20 @@ class SIPLogWriter;
  *  - malformed element of a list header   -> SIPMessage::malformed_header; valid elements
  *                                            stay in the field
  *  - unknown header                       -> SIPMessage::unknown_header (repetitions allowed)
+ *  - line that is no valid header         -> SIPMessage::malformed_header with empty name and
+ *    (no ':', empty name, continuation       the whole line as value
+ *    line without preceding header)
  * Missing or empty headers simply leave the field empty; no evaluation takes place.
+ * Repeated parameters (tag, branch, transport, expires): the first occurrence fills
+ * the field, further ones stay in the remaining parameters.
  *
  * @note Framing is the caller's responsibility: parse_message() expects exactly one
- *       complete message.
+ *       complete message with CRLF line endings.
  * @note Dispatcher and logger are optional and not owned; the caller must keep them
  *       alive for the lifetime of the parser.
- * @todo Line folding (continuation lines starting with SP/HTAB) is not supported yet.
+ * @note Not thread-safe: parse_message() updates the packet counters. Use one
+ *       instance per thread.
+ * @todo Leading CRLFs before the start-line currently result in is_complete == false.
  * @todo on_event() does not forward the parsed message yet (Event::parsed_msg).
  */
 class SIPParser : public EventHandler {
@@ -54,14 +70,15 @@ public:
      *
      * @param sip_message Complete raw SIP message incl. header terminator (CRLFCRLF).
      * @return Parsed message. SIPMessage::is_complete is false if no header
-     *         terminator was found; all other fields are left empty in that case.
+     *         terminator was found or the input starts with CRLF; all other
+     *         fields are left empty in that case.
      */
     SIPMessage parse_message(std::string_view sip_message);
 
-    /// @brief Number of messages parsed by this instance.
+    /// @brief Number of parse_message() calls on this instance, incl. incomplete messages.
     [[nodiscard]] unsigned int get_total_pkt_count() const { return m_total_pkt_count; }
 
-    /// @brief Number of incomplete messages parsed by this instance
+    /// @brief Number of parse_message() calls that returned SIPMessage::is_complete == false.
     [[nodiscard]] unsigned int get_incomplete_pkt_count() const { return m_incomplete_pkt_count; }
 
     /**
@@ -74,7 +91,7 @@ private:
     EventDispatcher* m_dispatcher = nullptr;    ///< Optional, not owned.
     SIPLogWriter* m_logger = nullptr;           ///< Optional, not owned.
     unsigned int m_total_pkt_count{0};          ///< Incremented per parse_message() call.
-    unsigned int m_incomplete_pkt_count{0};     ///< Incremented per parse_message() call.
+    unsigned int m_incomplete_pkt_count{0};     ///< Incremented per incomplete message.
 
 };
 
