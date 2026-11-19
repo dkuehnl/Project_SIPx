@@ -68,9 +68,29 @@ static constexpr std::string_view error_names[] = {
 
 
 SIPLogWriter::SIPLogWriter(const LogConfig& config) {
-    if (config.filepath == "") {
+    if (config.log_dir == "") {
         throw std::invalid_argument("Empty string as filepath is not allowed");
     }
+
+    std::error_code error_code{};
+    const auto status = std::filesystem::status(config.log_dir.value(), error_code);
+
+    if (!std::filesystem::exists(status)) {
+        throw std::filesystem::filesystem_error(
+            "Log directory does not exist or permission denied",
+            config.log_dir.value(),
+            std::make_error_code(std::errc::no_such_file_or_directory)
+            );
+    }
+
+    if (!std::filesystem::is_directory(status)) {
+        throw std::filesystem::filesystem_error(
+            "Provided path is not a directory",
+            config.log_dir.value(),
+            std::make_error_code(std::errc::not_a_directory)
+            );
+    }
+
 }
 
 void SIPLogWriter::log(LogLevel lvl, std::string_view source_module, std::string_view msg) {

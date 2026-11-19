@@ -54,7 +54,7 @@
 #include "../eventhandler/EventDispatcher.h"
 
 struct LogConfig {
-    std::optional<std::filesystem::path> filepath;
+    std::optional<std::filesystem::path> log_dir;
     LogLevel level = LogLevel::Warn;
 };
 
@@ -82,7 +82,7 @@ enum class ErrorCode {
 class SIPLogWriter final : public ILogWriter {
 public:
     explicit SIPLogWriter(const LogConfig& config);
-    bool is_enabled(LogLevel lvl) const noexcept override { return lvl >= m_level; }
+    bool is_enabled(const LogLevel lvl) const noexcept override { return lvl >= m_level; }
     void log(LogLevel lvl, std::string_view source_module, std::string_view msg) override;
 
 private:
