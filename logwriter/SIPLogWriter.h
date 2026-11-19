@@ -44,10 +44,19 @@
 #ifndef SIP_PARSER_SIPLOGWRITER_H
 #define SIP_PARSER_SIPLOGWRITER_H
 
+#include <atomic>
 #include <string>
 #include <filesystem>
+#include <optional>
+
+#include "ILogWriter.h"
 #include "../eventhandler/EventHandler.h"
 #include "../eventhandler/EventDispatcher.h"
+
+struct LogConfig {
+    std::optional<std::filesystem::path> filepath;
+    LogLevel level = LogLevel::Warn;
+};
 
 enum class ErrorCode {
     OK,
@@ -68,23 +77,16 @@ enum class ErrorCode {
     SERVICE_UNAVAILABLE
 };
 
-class SIPLogWriter : public EventHandler {
+
+
+class SIPLogWriter final : public ILogWriter {
 public:
-    explicit SIPLogWriter(const std::string &filepath, EventDispatcher* dispatcher = nullptr);
-
-    void write_log(const std::string_view msg);
-    static std::string_view parse_error_code(ErrorCode code);
-
-    void on_event(Event& evt) override;
+    explicit SIPLogWriter(const LogConfig& config);
+    bool is_enabled(LogLevel lvl) const noexcept override { return lvl >= m_level; }
+    void log(LogLevel lvl, std::string_view source_module, std::string_view msg) override;
 
 private:
-    bool check_prepare_filepath(const std::string& input);
-    static bool can_write_to_dir(const std::filesystem::path& dir);
-    static bool is_valid_path(const std::string& filepath);
-    static bool dir_exists(const std::filesystem::path& dir);
-
-    std::filesystem::path m_filepath;
-    EventDispatcher* m_dispatcher = nullptr;
+    std::atomic<LogLevel> m_level{};
 };
 
 

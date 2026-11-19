@@ -66,16 +66,19 @@ static constexpr std::string_view error_names[] = {
     "SERVICE_UNAVAILABLE"
 };
 
-SIPLogWriter::SIPLogWriter(const std::string &filepath, EventDispatcher* dispatcher) : m_dispatcher(dispatcher){
-    if (m_dispatcher != nullptr) {
-        m_dispatcher->register_listener(this);
-    }
 
-    if (!check_prepare_filepath(filepath)) {
-        throw std::runtime_error("Invalid filepath");
+SIPLogWriter::SIPLogWriter(const LogConfig& config) {
+    if (config.filepath == "") {
+        throw std::invalid_argument("Empty string as filepath is not allowed");
     }
 }
 
+void SIPLogWriter::log(LogLevel lvl, std::string_view source_module, std::string_view msg) {
+
+}
+
+
+/*
 void SIPLogWriter::on_event(Event &evt) {
     if (evt.type == EventType::LOG_MESSAGE) {
         write_log(evt.log_message);
@@ -138,3 +141,4 @@ void SIPLogWriter::write_log(const std::string_view msg) {
 std::string_view SIPLogWriter::parse_error_code(ErrorCode code) {
     return error_names[static_cast<size_t>(code)];
 }
+*/

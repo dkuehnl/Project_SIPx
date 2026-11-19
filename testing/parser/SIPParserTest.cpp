@@ -6,7 +6,7 @@
 #include "SIPTestMessages.h"
 
 void PrintTo(ErrorCode code, std::ostream* os) {
-    *os << SIPLogWriter::parse_error_code(code);
+
 }
 
 namespace {
